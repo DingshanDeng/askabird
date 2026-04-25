@@ -15,9 +15,8 @@ stability_score     : float  – 0-1  (1 = pristine, 0 = severely degraded)
 from __future__ import annotations
 
 import logging
-import math
 from functools import lru_cache
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -31,6 +30,7 @@ from backend.config import (
     OFFSET_STRUCTURES,
 )
 from backend.data_ingestion import load_sightings
+from backend.mock_data import POWER_PLANTS, _dist_to_points, _road_density, _building_density
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +66,6 @@ def get_model() -> RandomForestRegressor:
 
 def _enrich_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add derived feature columns when they are absent (e.g. real eBird data)."""
-    from backend.mock_data import (
-        POWER_PLANTS,
-        _dist_to_points,
-        _road_density,
-        _building_density,
-    )
-
     if "dist_power_plant_km" not in df.columns:
         df["dist_power_plant_km"] = df.apply(
             lambda r: _dist_to_points(r["latitude"], r["longitude"], POWER_PLANTS) * 111,
@@ -109,13 +102,6 @@ def _features_for_point(
     day_of_year: int = 180,
 ) -> pd.DataFrame:
     """Build a single-row feature DataFrame for a given location."""
-    from backend.mock_data import (
-        POWER_PLANTS,
-        _dist_to_points,
-        _road_density,
-        _building_density,
-    )
-
     dist_pp = _dist_to_points(lat, lon, POWER_PLANTS) * 111
     road_prox = _road_density(lat, lon)
     bldg_d = _building_density(lat, lon)
@@ -162,7 +148,6 @@ def predict_impact(
     model = get_model()
 
     # Baseline (no extra construction)
-    from backend.mock_data import POWER_PLANTS, _dist_to_points, _road_density, _building_density
     dist_pp = _dist_to_points(lat, lon, POWER_PLANTS) * 111
     road_prox = _road_density(lat, lon)
     bldg_d = _building_density(lat, lon)
@@ -176,7 +161,6 @@ def predict_impact(
 
     # After construction
     impact_feat = _features_for_point(lat, lon, construction_type, day_of_year)
-    raw_score = float(model.predict(impact_feat)[0])
 
     # Apply construction-type multiplier
     multiplier = CONSTRUCTION_IMPACT.get(construction_type, 0.5)

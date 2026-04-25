@@ -11,7 +11,6 @@ Layout
 from __future__ import annotations
 
 import os
-import math
 import requests
 import streamlit as st
 import folium
@@ -42,6 +41,14 @@ CONSTRUCTION_COLORS = {
 
 TUCSON_CENTER = [32.20, -110.92]
 TUCSON_BOUNDS = [[32.05, -111.10], [32.35, -110.75]]
+
+# Scales impact_pct (already negative for harm) into ecological credit points.
+# e.g. a −42% impact yields −21 credit points.
+ECO_CREDIT_MULTIPLIER = 0.5
+
+# Grid search parameters used for site optimisation
+OPTIMIZE_GRID_SIZE = 20
+OPTIMIZE_TOP_N = 3
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -116,7 +123,11 @@ def _optimize(ctype: str) -> list | None:
     try:
         r = requests.post(
             f"{BACKEND_URL}/optimize",
-            json={"construction_type": ctype},
+            json={
+                "construction_type": ctype,
+                "grid_size": OPTIMIZE_GRID_SIZE,
+                "top_n": OPTIMIZE_TOP_N,
+            },
             timeout=30,
         )
         r.raise_for_status()
@@ -128,7 +139,7 @@ def _optimize(ctype: str) -> list | None:
 
 def _eco_delta(impact_pct: float) -> float:
     """Convert impact percentage to ecological credit change."""
-    return impact_pct * 0.5   # impact_pct is already negative for harm
+    return impact_pct * ECO_CREDIT_MULTIPLIER
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +166,10 @@ with st.sidebar:
     # Optimize button
     st.markdown("---")
     st.subheader("🔍 Find Optimal Sites")
-    st.caption("Runs 400-point grid search to find the 3 lowest-impact locations.")
+    st.caption(
+        f"Runs {OPTIMIZE_GRID_SIZE * OPTIMIZE_GRID_SIZE}-point grid search "
+        f"to find the {OPTIMIZE_TOP_N} lowest-impact locations."
+    )
     if st.button("✨ Optimize Placement", use_container_width=True):
         with st.spinner("Running optimisation…"):
             sites = _optimize(st.session_state.selected_ctype)
