@@ -29,7 +29,7 @@ from backend.config import (
     CONSTRUCTION_IMPACT,
     OFFSET_STRUCTURES,
 )
-from backend.data_ingestion import load_sightings
+from backend.data_ingestion import load_sightings, get_infrastructure_density, get_nearest_power_facility
 from backend.mock_data import POWER_PLANTS, _dist_to_points, _road_density, _building_density
 
 logger = logging.getLogger(__name__)
@@ -144,6 +144,7 @@ def predict_impact(
         impact_score    : float  (after construction)
         delta           : float  (impact_score - baseline_score, negative = harm)
         impact_pct      : float  (percentage change)
+        extracted_features: dict (OSMnx data)
     """
     model = get_model()
 
@@ -170,11 +171,23 @@ def predict_impact(
     delta = impact_score - baseline_score
     impact_pct = (delta / max(baseline_score, 1e-6)) * 100
 
+    # Extract real-world features using OSMnx
+    infra_density = get_infrastructure_density(lat, lon)
+    power_facility = get_nearest_power_facility(lat, lon)
+    
+    extracted_features = {
+        "building_count": infra_density.get("building_count", 0),
+        "total_street_length": infra_density.get("total_street_length", 0.0),
+        "nearest_distance_meters": power_facility.get("nearest_distance_meters"),
+        "facility_type": power_facility.get("facility_type", "unknown")
+    }
+
     return {
         "baseline_score": round(baseline_score, 4),
         "impact_score": round(impact_score, 4),
         "delta": round(delta, 4),
         "impact_pct": round(impact_pct, 2),
+        "extracted_features": extracted_features
     }
 
 

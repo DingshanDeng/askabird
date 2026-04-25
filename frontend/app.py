@@ -66,7 +66,7 @@ st.set_page_config(
 def _init_state():
     defaults = {
         "chat_history": [],
-        "markers": [],          # list of {lat, lon, ctype, impact_score, delta, impact_pct}
+        "markers": [],          # list of {lat, lon, ctype, impact_score, delta, impact_pct, extracted_features}
         "optimal_sites": [],    # list of {lat, lon, impact_score}
         "eco_credit": 100.0,    # running ecological credit score
         "selected_ctype": "power_plant",
@@ -86,10 +86,13 @@ def _predict(lat: float, lon: float, ctype: str) -> dict | None:
         r = requests.post(
             f"{BACKEND_URL}/predict",
             json={"lat": lat, "lon": lon, "construction_type": ctype},
-            timeout=10,
+            timeout=60,
         )
         r.raise_for_status()
         return r.json()
+    except requests.exceptions.Timeout:
+        st.sidebar.error("The spatial data took too long to load from OSM. Please try a different location or try again later.")
+        return None
     except Exception as e:
         st.sidebar.error(f"Backend error: {e}")
         return None
@@ -110,10 +113,13 @@ def _chat(lat: float, lon: float, ctype: str, pred: dict, user_msg: str) -> str 
                 "offsets": pred.get("offsets", []),
                 "user_message": user_msg,
             },
-            timeout=15,
+            timeout=60,
         )
         r.raise_for_status()
         return r.json()["bird_response"]
+    except requests.exceptions.Timeout:
+        st.sidebar.error("Consulting the bird took too long. The server might be busy analyzing spatial data.")
+        return None
     except Exception as e:
         st.sidebar.error(f"Chat error: {e}")
         return None
@@ -128,10 +134,13 @@ def _optimize(ctype: str) -> list | None:
                 "grid_size": OPTIMIZE_GRID_SIZE,
                 "top_n": OPTIMIZE_TOP_N,
             },
-            timeout=30,
+            timeout=120, # Optimization takes much longer due to multiple points
         )
         r.raise_for_status()
         return r.json()["sites"]
+    except requests.exceptions.Timeout:
+        st.sidebar.error("Optimization grid search timed out. Spatial analysis for this many points is computationally intensive.")
+        return None
     except Exception as e:
         st.sidebar.error(f"Optimize error: {e}")
         return None
@@ -163,6 +172,30 @@ with st.sidebar:
         "_Click anywhere on the map to place the selected structure and see its biodiversity impact._"
     )
 
+    # Site Analysis Section
+    if st.session_state.markers:
+        last_marker = st.session_state.markers[-1]
+        features = last_marker.get("extracted_features", {})
+        
+        if features:
+            st.markdown("---")
+            st.subheader("📊 Site Analysis (1km Radius)")
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("Nearby Buildings", f"{features.get('building_count', 0)}")
+            with col_b:
+                street_len_km = features.get('total_street_length', 0) / 1000.0
+                st.metric("Road Density", f"{street_len_km:.2f} km")
+            
+            # Power facility info
+            dist_m = features.get('nearest_distance_meters')
+            fac_type = features.get('facility_type', 'unknown')
+            if dist_m is not None:
+                st.metric("Nearest Power Facility", f"{fac_type.title()}", delta=f"{dist_m/1000.0:.1f} km away", delta_color="off")
+            else:
+                st.metric("Nearest Power Facility", "None within 50km")
+
     # Optimize button
     st.markdown("---")
     st.subheader("🔍 Find Optimal Sites")
@@ -179,7 +212,7 @@ with st.sidebar:
 
     # Balance sheet
     st.markdown("---")
-    st.subheader("📊 Ecological Balance Sheet")
+    st.subheader("💰 Ecological Balance Sheet")
     credit = st.session_state.eco_credit
     credit_color = "green" if credit >= 80 else "orange" if credit >= 50 else "red"
     st.markdown(
@@ -243,7 +276,7 @@ with st.sidebar:
 st.markdown("### 🗺️ Tucson, AZ — Biodiversity Impact Map")
 st.caption(
     "Click on the map to drop your selected structure. "
-    "Green circles = AI-suggested optimal sites."
+    "Grey circles represent the 1km search radius for site density analysis."
 )
 
 # Build Folium map
@@ -253,19 +286,35 @@ m = folium.Map(
     tiles="CartoDB positron",
 )
 
-# Add existing markers
+# Add existing markers and search radius circles
 for marker in st.session_state.markers:
     pct = marker.get("impact_pct", 0)
     color = CONSTRUCTION_COLORS.get(marker["ctype"], "blue")
+    features = marker.get("extracted_features", {})
+    b_count = features.get("building_count", "N/A")
+    
     popup_html = (
         f"<b>{marker['ctype'].replace('_',' ').title()}</b><br>"
         f"Baseline: {marker.get('baseline_score', 0):.3f}<br>"
         f"Post-build: {marker.get('impact_score', 0):.3f}<br>"
-        f"Change: <span style='color:{'red' if pct < 0 else 'green'}'>{pct:.1f}%</span>"
+        f"Change: <span style='color:{'red' if pct < 0 else 'green'}'>{pct:.1f}%</span><br>"
+        f"Buildings within 1km: {b_count}"
     )
+    
+    # 1km radius circle
+    folium.Circle(
+        location=[marker["lat"], marker["lon"]],
+        radius=1000,
+        color="gray",
+        fill=True,
+        fill_color="gray",
+        fill_opacity=0.1,
+        weight=1
+    ).add_to(m)
+    
     folium.Marker(
         location=[marker["lat"], marker["lon"]],
-        popup=folium.Popup(popup_html, max_width=200),
+        popup=folium.Popup(popup_html, max_width=250),
         icon=folium.Icon(color=color, icon="home", prefix="fa"),
     ).add_to(m)
 
@@ -291,6 +340,7 @@ map_data = st_folium(
     width="100%",
     height=620,
     returned_objects=["last_clicked"],
+    key="main_map",
 )
 
 # ---------------------------------------------------------------------------
@@ -303,7 +353,7 @@ if clicked and clicked != st.session_state.last_click:
     lon = clicked["lng"]
     ctype = st.session_state.selected_ctype
 
-    with st.spinner(f"Predicting impact of {ctype.replace('_', ' ')}…"):
+    with st.spinner("Analyzing site data and consulting the local birds... This may take up to 30 seconds."):
         pred = _predict(lat, lon, ctype)
 
     if pred:
@@ -336,6 +386,6 @@ if clicked and clicked != st.session_state.last_click:
         col1, col2, col3 = st.columns(3)
         col1.metric("Baseline Score", f"{pred['baseline_score']:.3f}")
         col2.metric("Post-Build Score", f"{pred['impact_score']:.3f}", delta=f"{pct:.1f}%")
-        col3.metric("Ecological Credit", f"{st.session_state.eco_credit:.1f}")
+        col3.metric("Ecological Credit Balance", f"{st.session_state.eco_credit:.1f}")
 
         st.rerun()

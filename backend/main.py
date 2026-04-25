@@ -65,6 +65,7 @@ class PredictResponse(BaseModel):
     delta: float
     impact_pct: float
     offsets: List[dict]
+    extracted_features: dict = Field(default_factory=dict)
 
 
 class OptimizeRequest(BaseModel):

@@ -9,8 +9,9 @@ from shapely.geometry import Point
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Enable osmnx caching
+# Enable osmnx caching and set timeout
 ox.settings.use_cache = True
+ox.settings.timeout = 30
 
 def load_sightings(lat: float = None, lon: float = None, radius_meters: int = 1000) -> pd.DataFrame:
     """
@@ -72,9 +73,9 @@ def get_infrastructure_density(lat: float, lon: float, radius_meters: int = 1000
 
     return result
 
-def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 50000) -> dict:
+def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 15000) -> dict:
     """
-    Find the nearest power plant or generator within a radius using OSMnx.
+    Find the nearest power plant within a radius using OSMnx.
     
     Returns:
         dict: {
@@ -83,7 +84,7 @@ def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 5000
             "facility_type": str
         }
     """
-    logger.info(f"Searching for power facilities near lat={lat}, lon={lon} within {radius_meters}m")
+    logger.info(f"Searching for power plants near lat={lat}, lon={lon} within {radius_meters}m")
     
     result = {
         "has_facility": False,
@@ -92,11 +93,11 @@ def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 5000
     }
 
     try:
-        tags = {'power': ['plant', 'generator']}
+        tags = {'power': 'plant'}
         facilities = ox.features_from_point((lat, lon), tags=tags, dist=radius_meters)
         
         if facilities.empty:
-            logger.info("No power facilities found within the radius.")
+            logger.info("No power plants found within the radius.")
             return result
             
         result["has_facility"] = True
@@ -118,8 +119,7 @@ def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 5000
         nearest_facility = facilities.iloc[distances.argmin()]
         
         # Extract energy source from various possible tags
-        source = (nearest_facility.get("generator:source") or 
-                  nearest_facility.get("plant:source") or 
+        source = (nearest_facility.get("plant:source") or 
                   nearest_facility.get("source") or 
                   "unknown")
         
@@ -130,10 +130,15 @@ def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 5000
             source = "unknown"
             
         result["facility_type"] = str(source)
-        logger.info(f"Nearest facility found at {min_dist:.2f}m. Type: {result['facility_type']}")
+        logger.info(f"Nearest plant found at {min_dist:.2f}m. Type: {result['facility_type']}")
         
     except Exception as e:
-        logger.info(f"Error searching for power facilities: {e}")
+        logger.error(f"Error searching for power facilities (timeout or network): {e}")
+        return {
+            "has_facility": False,
+            "nearest_distance_meters": None,
+            "facility_type": "unknown"
+        }
         
     return result
 
