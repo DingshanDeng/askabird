@@ -1,105 +1,156 @@
-"""
-Data ingestion helpers.
-
-Real API usage:
-  - eBird Basic Dataset via the eBird API 2.0
-    https://documenter.getpostman.com/view/664302/S1ENwy59
-  - OpenStreetMap via the Overpass API
-
-Falls back to mock data when API keys are absent.
-"""
 import logging
-from functools import lru_cache
+import osmnx as ox
+import networkx as nx
+import geopandas as gpd
 import pandas as pd
-import requests
-from backend.config import EBIRD_API_KEY, TUCSON_BOUNDS
-from backend.mock_data import generate_sightings, generate_infrastructure
+from shapely.geometry import Point
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Enable osmnx caching
+ox.settings.use_cache = True
 
-@lru_cache(maxsize=1)
-def load_sightings() -> pd.DataFrame:
-    """Return bird sighting data, using the eBird API when a key is set."""
-    if EBIRD_API_KEY:
-        try:
-            return _fetch_ebird_sightings()
-        except Exception as exc:
-            logger.warning("eBird API call failed (%s). Falling back to mock data.", exc)
-    return generate_sightings()
-
-
-@lru_cache(maxsize=1)
-def load_infrastructure() -> pd.DataFrame:
-    """Return OSM infrastructure data, using Overpass API when available."""
-    try:
-        return _fetch_osm_infrastructure()
-    except Exception as exc:
-        logger.warning("Overpass API call failed (%s). Falling back to mock data.", exc)
-    return generate_infrastructure()
-
-
-# ---------------------------------------------------------------------------
-# Real API helpers (used only when keys/network are available)
-# ---------------------------------------------------------------------------
-
-def _fetch_ebird_sightings() -> pd.DataFrame:
-    """Fetch recent bird observations from eBird for the Tucson bounding box."""
-    b = TUCSON_BOUNDS
-    url = (
-        "https://api.ebird.org/v2/data/obs/geo/recent"
-        f"?lat={(b['min_lat'] + b['max_lat']) / 2}"
-        f"&lng={(b['min_lon'] + b['max_lon']) / 2}"
-        "&dist=30&maxResults=3000&back=30"
-    )
-    headers = {"X-eBirdApiToken": EBIRD_API_KEY}
-    resp = requests.get(url, headers=headers, timeout=15)
-    resp.raise_for_status()
-    raw = resp.json()
-    if not raw:
-        raise ValueError("Empty eBird response")
-    rows = [
-        {
-            "latitude": r["lat"],
-            "longitude": r["lng"],
-            "species": r.get("comName", "Unknown"),
-            "day_of_year": pd.Timestamp(r["obsDt"]).day_of_year,
-        }
-        for r in raw
-    ]
-    return pd.DataFrame(rows)
-
-
-def _fetch_osm_infrastructure() -> pd.DataFrame:
-    """Query Overpass API for power plants, industrial areas, and highways."""
-    b = TUCSON_BOUNDS
-    overpass_query = f"""
-    [out:json][timeout:25];
-    (
-      node["power"="plant"]({b['min_lat']},{b['min_lon']},{b['max_lat']},{b['max_lon']});
-      node["landuse"="industrial"]({b['min_lat']},{b['min_lon']},{b['max_lat']},{b['max_lon']});
-      way["highway"~"motorway|trunk|primary"]({b['min_lat']},{b['min_lon']},{b['max_lat']},{b['max_lon']});
-    );
-    out center;
+def load_sightings(lat: float = None, lon: float = None, radius_meters: int = 1000) -> pd.DataFrame:
     """
-    resp = requests.post(
-        "https://overpass-api.de/api/interpreter",
-        data=overpass_query,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    elements = resp.json().get("elements", [])
-    rows = []
-    for el in elements:
-        lat = el.get("lat") or el.get("center", {}).get("lat")
-        lon = el.get("lon") or el.get("center", {}).get("lon")
-        if lat and lon:
-            tags = el.get("tags", {})
-            rows.append({
-                "latitude": lat,
-                "longitude": lon,
-                "type": tags.get("power") or tags.get("landuse") or tags.get("highway", "unknown"),
-            })
-    if not rows:
-        raise ValueError("Empty Overpass response")
-    return pd.DataFrame(rows)
+    Dummy function for eBird sightings to prevent ImportError.
+    Eventually, this will connect to the real eBird API.
+    """
+    logger.info("Loading dummy sightings data.")
+    data = [
+        {"species": "Cactus Wren", "count": 2, "latitude": lat or 32.2226, "longitude": lon or -110.9747, "day_of_year": 100},
+        {"species": "Gila Woodpecker", "count": 1, "latitude": lat or 32.2226, "longitude": lon or -110.9747, "day_of_year": 105}
+    ]
+    return pd.DataFrame(data)
+
+def get_infrastructure_density(lat: float, lon: float, radius_meters: int = 1000) -> dict:
+    """
+    Fetch human infrastructure data (buildings and streets) within a radius using OSMnx.
+    
+    Returns:
+        dict: {
+            "building_count": int,
+            "total_street_length": float,
+            "latitude": float,
+            "longitude": float,
+            "radius": int
+        }
+    """
+    logger.info(f"Fetching infrastructure data for lat={lat}, lon={lon}, radius={radius_meters}m")
+    
+    result = {
+        "building_count": 0,
+        "total_street_length": 0.0,
+        "latitude": lat,
+        "longitude": lon,
+        "radius": radius_meters
+    }
+
+    try:
+        # 1. Fetch buildings
+        try:
+            buildings = ox.features_from_point((lat, lon), tags={"building": True}, dist=radius_meters)
+            result["building_count"] = len(buildings)
+            logger.info(f"Found {result['building_count']} buildings.")
+        except Exception as e:
+            logger.info(f"No buildings found or error fetching buildings: {e}")
+            result["building_count"] = 0
+
+        # 2. Fetch street network
+        try:
+            G = ox.graph_from_point((lat, lon), dist=radius_meters, network_type="drive")
+            _, edges = ox.graph_to_gdfs(G)
+            result["total_street_length"] = float(edges["length"].sum())
+            logger.info(f"Total street length: {result['total_street_length']:.2f} meters.")
+        except Exception as e:
+            logger.info(f"No streets found or error fetching streets: {e}")
+            result["total_street_length"] = 0.0
+
+    except Exception as e:
+        logger.error(f"Unexpected error in get_infrastructure_density: {e}")
+
+    return result
+
+def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 50000) -> dict:
+    """
+    Find the nearest power plant or generator within a radius using OSMnx.
+    
+    Returns:
+        dict: {
+            "has_facility": bool,
+            "nearest_distance_meters": float or None,
+            "facility_type": str
+        }
+    """
+    logger.info(f"Searching for power facilities near lat={lat}, lon={lon} within {radius_meters}m")
+    
+    result = {
+        "has_facility": False,
+        "nearest_distance_meters": None,
+        "facility_type": "unknown"
+    }
+
+    try:
+        tags = {'power': ['plant', 'generator']}
+        facilities = ox.features_from_point((lat, lon), tags=tags, dist=radius_meters)
+        
+        if facilities.empty:
+            logger.info("No power facilities found within the radius.")
+            return result
+            
+        result["has_facility"] = True
+        
+        # Project to local UTM for accurate distance calculation
+        gdf_proj = ox.project_gdf(facilities)
+        
+        # Project the origin point to the same CRS
+        point_gdf = gpd.GeoDataFrame(geometry=[Point(lon, lat)], crs="EPSG:4326")
+        point_gdf_proj = point_gdf.to_crs(gdf_proj.crs)
+        origin_proj = point_gdf_proj.geometry.iloc[0]
+        
+        # Calculate distances to all facilities
+        distances = gdf_proj.distance(origin_proj)
+        min_dist = distances.min()
+        result["nearest_distance_meters"] = float(min_dist)
+        
+        # Find the row with the minimum distance to extract tags
+        nearest_facility = facilities.iloc[distances.argmin()]
+        
+        # Extract energy source from various possible tags
+        source = (nearest_facility.get("generator:source") or 
+                  nearest_facility.get("plant:source") or 
+                  nearest_facility.get("source") or 
+                  "unknown")
+        
+        # Handle cases where source might be a list or NaN
+        if isinstance(source, list):
+            source = source[0]
+        if str(source) == 'nan':
+            source = "unknown"
+            
+        result["facility_type"] = str(source)
+        logger.info(f"Nearest facility found at {min_dist:.2f}m. Type: {result['facility_type']}")
+        
+    except Exception as e:
+        logger.info(f"Error searching for power facilities: {e}")
+        
+    return result
+
+if __name__ == "__main__":
+    # Test locations
+    test_locations = [
+        {"name": "Tucson Downtown", "lat": 32.2226, "lon": -110.9747},
+        {"name": "Saguaro National Park", "lat": 32.1746, "lon": -110.7339}
+    ]
+
+    for loc in test_locations:
+        print(f"\n--- Testing location: {loc['name']} ---")
+        
+        # Test Infrastructure Density
+        density_data = get_infrastructure_density(loc['lat'], loc['lon'])
+        print(f"Density Results: {density_data}")
+        
+        # Test Nearest Power Facility
+        power_data = get_nearest_power_facility(loc['lat'], loc['lon'])
+        print(f"Power Facility Results: {power_data}")
