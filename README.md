@@ -21,34 +21,34 @@ with an AI from a local bird's perspective.
 
 ### 1. Install dependencies
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ### 2. Configure environment (optional)
 
-\`\`\`bash
+```bash
 cp .env.example .env
 # Add your EBIRD_API_KEY and OPENAI_API_KEY (both optional – mock data is used when absent)
-\`\`\`
+```
 
 ### 3. Start the backend
 
-\`\`\`bash
+```bash
 uvicorn backend.main:app --reload --port 8000
-\`\`\`
+```
 
 ### 4. Start the frontend (new terminal)
 
-\`\`\`bash
+```bash
 streamlit run frontend/app.py
-\`\`\`
+```
 
 Open http://localhost:8501 in your browser.
 
 ## Architecture
 
-\`\`\`
+```
 ┌─────────────────────┐       HTTP/REST        ┌───────────────────────┐
 │  Streamlit Frontend │ ─────────────────────► │  FastAPI Backend       │
 │  frontend/app.py    │                        │  backend/main.py       │
@@ -69,26 +69,26 @@ Open http://localhost:8501 in your browser.
                                                │  backend/data_ingestion│
                                                │  eBird + OSM (mock)    │
                                                └───────────────────────┘
-\`\`\`
+```
 
 ## API Reference
 
-### \`POST /predict\`
-\`\`\`json
+### `POST /predict`
+```json
 { "lat": 32.22, "lon": -110.97, "construction_type": "power_plant" }
-\`\`\`
+```
 Returns biodiversity stability scores before/after construction + offset suggestions.
 
-### \`POST /optimize\`
-\`\`\`json
+### `POST /optimize`
+```json
 { "min_lat": 32.05, "max_lat": 32.35, "min_lon": -111.10, "max_lon": -110.75, "construction_type": "power_plant" }
-\`\`\`
+```
 Returns the 3 grid cells with the lowest negative impact.
 
-### \`POST /chat\`
-\`\`\`json
+### `POST /chat`
+```json
 { "lat": 32.22, "lon": -110.97, "construction_type": "power_plant", "baseline_score": 0.72, "impact_score": 0.41, "delta": -0.31, "impact_pct": -43.1, "offsets": [...], "user_message": "What do you think?" }
-\`\`\`
+```
 Returns a bird-perspective narrative response.
 
 ## Data Sources
