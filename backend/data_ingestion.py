@@ -48,8 +48,8 @@ def _fetch_ebird_sightings() -> pd.DataFrame:
     b = TUCSON_BOUNDS
     url = (
         "https://api.ebird.org/v2/data/obs/geo/recent"
-        f"?lat={( b['min_lat'] + b['max_lat'] ) / 2}"
-        f"&lng={( b['min_lon'] + b['max_lon'] ) / 2}"
+        f"?lat={(b['min_lat'] + b['max_lat']) / 2}"
+        f"&lng={(b['min_lon'] + b['max_lon']) / 2}"
         "&dist=30&maxResults=3000&back=30"
     )
     headers = {"X-eBirdApiToken": EBIRD_API_KEY}

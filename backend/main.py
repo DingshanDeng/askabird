@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
 import httpx
@@ -19,18 +20,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from backend.config import OPENAI_API_KEY, CONSTRUCTION_TYPES, TUCSON_BOUNDS
-from backend.ml_model import predict_impact, find_optimal_sites, suggest_offsets
+from backend.ml_model import predict_impact, find_optimal_sites, suggest_offsets, get_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Pre-warm the model on startup
-from backend.ml_model import get_model  # noqa: E402  (after config import)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Pre-warming Random Forest model…")
+    get_model()
+    logger.info("Model ready.")
+    yield
+
 
 app = FastAPI(
     title="AskABird API",
     description="Biodiversity impact prediction and bird-perspective AI chat.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -39,13 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def _warm_model():
-    logger.info("Pre-warming Random Forest model…")
-    get_model()
-    logger.info("Model ready.")
 
 
 # ---------------------------------------------------------------------------
