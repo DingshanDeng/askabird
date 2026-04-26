@@ -24,7 +24,7 @@ AskABird is a web app that lets you explore bird biodiversity across Tucson, AZ 
 ## Quick Start
 
 ```bash
-cd ask_a_bird_lovable
+cd app
 npm install
 npm run dev
 # open http://localhost:8080
@@ -34,7 +34,7 @@ The `.env` file is already configured with the hosted Supabase credentials — n
 
 ## Environment Variables
 
-### Frontend (`ask_a_bird_lovable/.env`)
+### Frontend (`app/.env`)
 ```
 VITE_SUPABASE_URL=https://...supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
@@ -53,7 +53,7 @@ Get a Gemini API key at https://aistudio.google.com/apikey
 ```
 ┌────────────────────────────────────┐
 │  React SPA (Vite, port 8080)       │
-│  ask_a_bird_lovable/src/           │
+│  app/src/           │
 │                                    │
 │  pages/Index.tsx    — bird chat    │
 │  pages/Optimize.tsx — impact score │
@@ -85,7 +85,7 @@ supabase functions deploy   # all functions
 ### Frontend (AWS — see plan.md for full options)
 
 **Amplify (easiest)**
-Connect the repo in Amplify, set build command to `cd ask_a_bird_lovable && npm run build`, output dir to `ask_a_bird_lovable/dist`, and add the `VITE_SUPABASE_*` env vars.
+Connect the repo in Amplify, set build command to `cd app && npm run build`, output dir to `app/dist`, and add the `VITE_SUPABASE_*` env vars.
 
 **S3 + CloudFront**
 ```bash

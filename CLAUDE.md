@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Active Codebase
 
-The live app is in **`ask_a_bird_lovable/`** — a React/Vite/TypeScript SPA backed by Supabase Edge Functions.
+The live app is in **`app/`** — a React/Vite/TypeScript SPA backed by Supabase Edge Functions.
 
 The old Python/FastAPI/Streamlit stack (`backend/`, `frontend/app.py`) is archived in `archive/`.
 
@@ -13,12 +13,12 @@ The old Python/FastAPI/Streamlit stack (`backend/`, `frontend/app.py`) is archiv
 ## Running Locally
 
 ```bash
-cd ask_a_bird_lovable
+cd app
 npm install          # first time only
 npm run dev          # Vite dev server at http://localhost:8080
 ```
 
-The frontend connects to the hosted Supabase project (credentials already in `ask_a_bird_lovable/.env`). No local backend process is needed for basic development.
+The frontend connects to the hosted Supabase project (credentials already in `app/.env`). No local backend process is needed for basic development.
 
 ### Running Edge Functions locally (optional)
 
@@ -38,7 +38,7 @@ EBIRD_API_KEY=...
 
 ## Architecture
 
-**`ask_a_bird_lovable/src/`** — React SPA (Vite + TypeScript + Tailwind + shadcn/ui)
+**`app/src/`** — React SPA (Vite + TypeScript + Tailwind + shadcn/ui)
 
 | File | Purpose |
 |---|---|
@@ -52,7 +52,7 @@ EBIRD_API_KEY=...
 | `hooks/useRegionBiodiversity.ts` | Fetches 15×15 heatmap grid from `region-biodiversity` |
 | `integrations/supabase/client.ts` | Supabase JS client (reads VITE_SUPABASE_* env vars) |
 
-**`ask_a_bird_lovable/supabase/functions/`** — Deno/TypeScript Edge Functions
+**`app/supabase/functions/`** — Deno/TypeScript Edge Functions
 
 | Function | Purpose |
 |---|---|
@@ -77,7 +77,7 @@ EBIRD_API_KEY=...
 
 ## Environment Variables
 
-### Frontend (`.env` in `ask_a_bird_lovable/`)
+### Frontend (`.env` in `app/`)
 | Variable | Purpose |
 |---|---|
 | `VITE_SUPABASE_URL` | Supabase project URL |
@@ -105,7 +105,7 @@ supabase functions deploy
 ## Building for Production
 
 ```bash
-cd ask_a_bird_lovable
+cd app
 npm run build     # output in dist/
 ```
 

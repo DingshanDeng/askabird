@@ -2,7 +2,7 @@
 
 ## Current State
 
-React/Vite/TypeScript single-page app (in `ask_a_bird_lovable/`) backed by Supabase Edge Functions (Deno/TypeScript). The old Python/FastAPI/Streamlit stack is archived.
+React/Vite/TypeScript single-page app (in `app/`) backed by Supabase Edge Functions (Deno/TypeScript). The old Python/FastAPI/Streamlit stack is archived.
 
 **Pages:**
 - `/` — Ask a Bird: Leaflet map + bird chat sidebar. Click any spot, pick a species, ask it about the location.
@@ -47,12 +47,12 @@ React/Vite/TypeScript single-page app (in `ask_a_bird_lovable/`) backed by Supab
 
 ### Option A — AWS Amplify (simplest)
 1. Connect the GitHub repo to Amplify.
-2. Set build command: `cd ask_a_bird_lovable && npm run build` and output dir: `ask_a_bird_lovable/dist`.
+2. Set build command: `cd app && npm run build` and output dir: `app/dist`.
 3. Set env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) in Amplify console.
 4. Amplify handles CI/CD, CDN, and custom domain automatically.
 
 ### Option B — S3 + CloudFront (standard)
-1. Build: `cd ask_a_bird_lovable && npm run build` → output in `dist/`.
+1. Build: `cd app && npm run build` → output in `dist/`.
 2. Upload `dist/` to an S3 bucket (static website hosting enabled).
 3. Create a CloudFront distribution pointing at the S3 bucket; set default root object to `index.html`; add a 403/404 → `index.html` error page rule (for SPA routing).
 4. Set env vars at build time or bake them into the bundle.
