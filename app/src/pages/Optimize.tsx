@@ -349,6 +349,7 @@ export default function Optimize() {
                       siteContext={siteCtx}
                       birdSpecies={birdSpecies}
                       autoOpener={opener}
+                      quickReplies={["Hey there, how can I reduce our impact even more?"]}
                     />
                   </div>
                 </CardContent>

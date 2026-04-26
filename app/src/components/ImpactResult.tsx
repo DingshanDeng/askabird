@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingDown, TrendingUp, Sparkles, Shield, Plane, Leaf } from "lucide-react";
+import { TrendingDown, TrendingUp, Shield, Plane, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { SiteContext } from "./BirdChat";
@@ -78,33 +78,6 @@ export interface AnalysisResult extends SiteContext {
   criteria?: CriteriaBreakdown;
 }
 
-const OFFSETS: Record<string, { name: string; credit: number }[]> = {
-  industrial: [
-    { name: "Emissions scrubbing & dust control", credit: 0.10 },
-    { name: "Dark-sky lighting policy", credit: 0.06 },
-    { name: "Native vegetation buffer (perimeter)", credit: 0.12 },
-  ],
-  building: [
-    { name: "Bird-safe glass retrofit", credit: 0.10 },
-    { name: "Green roof + native plants", credit: 0.12 },
-    { name: "Dark-sky lighting", credit: 0.05 },
-  ],
-  solar_farm: [
-    { name: "Pollinator-friendly ground cover", credit: 0.14 },
-    { name: "Wide panel spacing for wildlife corridors", credit: 0.10 },
-    { name: "Perimeter native restoration", credit: 0.08 },
-  ],
-  wind_farm: [
-    { name: "Radar-activated turbine shutdown", credit: 0.16 },
-    { name: "Micro-siting away from flyway peaks", credit: 0.12 },
-    { name: "UV blade markings (raptor visibility)", credit: 0.06 },
-  ],
-  nuclear_farm: [
-    { name: "Cooling-water thermal management", credit: 0.10 },
-    { name: "Exclusion zone as protected refuge", credit: 0.14 },
-    { name: "Riparian habitat restoration", credit: 0.08 },
-  ],
-};
 
 interface Props {
   result: AnalysisResult;
@@ -142,7 +115,6 @@ function CriteriaBar({
 
 export default function ImpactResult({ result, onSave, saving, saved }: Props) {
   const positive = result.delta >= 0;
-  const offsets = OFFSETS[result.construction_type] ?? [];
   const c = result.criteria;
 
   return (
@@ -210,14 +182,14 @@ export default function ImpactResult({ result, onSave, saving, saved }: Props) {
           />
           <CriteriaBar
             icon={<Plane className="h-3.5 w-3.5" />}
-            label="Migration pressure (low = safer)"
+            label="Migration pressure"
             weight="0.30"
             score={c.migratory.score}
             note={c.migratory.note}
           />
           <CriteriaBar
             icon={<Leaf className="h-3.5 w-3.5" />}
-            label="Biodiversity sensitivity (low = safer)"
+            label="Biodiversity sensitivity"
             weight="0.20"
             score={c.biodiversity.score}
             note={c.biodiversity.note}
@@ -250,23 +222,6 @@ export default function ImpactResult({ result, onSave, saving, saved }: Props) {
               </Badge>
             ))}
           </div>
-        </div>
-      )}
-
-      {offsets.length > 0 && (
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
-            <Sparkles className="h-3 w-3" />
-            Offset suggestions
-          </div>
-          <ul className="space-y-1">
-            {offsets.map((o) => (
-              <li key={o.name} className="text-xs flex justify-between">
-                <span>{o.name}</span>
-                <span className="text-saguaro font-medium">+{o.credit.toFixed(2)}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 

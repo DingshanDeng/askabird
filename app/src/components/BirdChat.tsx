@@ -24,23 +24,26 @@ interface BirdChatProps {
   birdSpecies: string;
   autoOpener?: string;
   initialMessage?: string;
+  quickReplies?: string[];
 }
 
 type Msg = { role: "user" | "assistant"; content: string; hidden?: boolean };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bird-chat`;
 
-export default function BirdChat({ siteContext, birdSpecies, autoOpener, initialMessage }: BirdChatProps) {
+export default function BirdChat({ siteContext, birdSpecies, autoOpener, initialMessage, quickReplies }: BirdChatProps) {
   const [messages, setMessages] = useState<Msg[]>(
     initialMessage ? [{ role: "assistant", content: initialMessage }] : []
   );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [usedQuickReplies, setUsedQuickReplies] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Reset chat when site context changes
   useEffect(() => {
     setMessages(initialMessage ? [{ role: "assistant", content: initialMessage }] : []);
+    setUsedQuickReplies(new Set());
   }, [siteContext.lat, siteContext.lon, siteContext.construction_type]);
 
   // Auto-opener: send a hidden seed prompt so the bird greets/reacts immediately.
@@ -237,6 +240,23 @@ export default function BirdChat({ siteContext, birdSpecies, autoOpener, initial
           )}
         </div>
       </div>
+
+      {quickReplies && quickReplies.filter((r) => !usedQuickReplies.has(r)).length > 0 && !loading && messages.some((m) => m.role === "assistant" && !m.hidden) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {quickReplies.filter((r) => !usedQuickReplies.has(r)).map((reply) => (
+            <button
+              key={reply}
+              onClick={() => {
+                setUsedQuickReplies((prev) => new Set(prev).add(reply));
+                send(reply);
+              }}
+              className="ml-auto text-left bg-muted text-muted-foreground rounded-lg px-3 py-2 text-sm hover:bg-muted/70 transition-colors border border-border"
+            >
+              {reply}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {
