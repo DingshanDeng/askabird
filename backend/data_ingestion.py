@@ -3,7 +3,12 @@ import osmnx as ox
 import networkx as nx
 import geopandas as gpd
 import pandas as pd
+import requests
+from functools import lru_cache
+from typing import List
 from shapely.geometry import Point
+from backend.config import EBIRD_API_KEY, TUCSON_BOUNDS, ARIZONA_BOUNDS
+from backend.mock_data import generate_sightings, generate_infrastructure
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,17 +18,41 @@ logger = logging.getLogger(__name__)
 ox.settings.use_cache = True
 ox.settings.timeout = 30
 
-def load_sightings(lat: float = None, lon: float = None, radius_meters: int = 1000) -> pd.DataFrame:
-    """
-    Dummy function for eBird sightings to prevent ImportError.
-    Eventually, this will connect to the real eBird API.
-    """
-    logger.info("Loading dummy sightings data.")
-    data = [
-        {"species": "Cactus Wren", "count": 2, "latitude": lat or 32.2226, "longitude": lon or -110.9747, "day_of_year": 100},
-        {"species": "Gila Woodpecker", "count": 1, "latitude": lat or 32.2226, "longitude": lon or -110.9747, "day_of_year": 105}
+@lru_cache(maxsize=1)
+def load_sightings() -> pd.DataFrame:
+    """Return bird sighting data, using the eBird API when a key is set."""
+    if EBIRD_API_KEY:
+        try:
+            return _fetch_ebird_sightings()
+        except Exception as exc:
+            logger.warning("eBird API call failed (%s). Falling back to mock data.", exc)
+    return generate_sightings()
+
+def _fetch_ebird_sightings() -> pd.DataFrame:
+    """Fetch recent bird observations from eBird for the Tucson bounding box."""
+    b = TUCSON_BOUNDS
+    url = (
+        "https://api.ebird.org/v2/data/obs/geo/recent"
+        f"?lat={(b['min_lat'] + b['max_lat']) / 2}"
+        f"&lng={(b['min_lon'] + b['max_lon']) / 2}"
+        "&dist=30&maxResults=3000&back=30"
+    )
+    headers = {"X-eBirdApiToken": EBIRD_API_KEY}
+    resp = requests.get(url, headers=headers, timeout=15)
+    resp.raise_for_status()
+    raw = resp.json()
+    if not raw:
+        raise ValueError("Empty eBird response")
+    rows = [
+        {
+            "latitude": r["lat"],
+            "longitude": r["lng"],
+            "species": r.get("comName", "Unknown"),
+            "day_of_year": pd.Timestamp(r["obsDt"]).day_of_year,
+        }
+        for r in raw
     ]
-    return pd.DataFrame(data)
+    return pd.DataFrame(rows)
 
 def get_infrastructure_density(lat: float, lon: float, radius_meters: int = 1000) -> dict:
     """
@@ -141,6 +170,91 @@ def get_nearest_power_facility(lat: float, lon: float, radius_meters: int = 1500
         }
         
     return result
+
+@lru_cache(maxsize=1)
+def fetch_hotspots_region(region_code: str = "US-AZ") -> List[dict]:
+    """
+    Return all eBird hotspots for an entire region (e.g. 'US-AZ' for Arizona).
+    """
+    if not EBIRD_API_KEY:
+        return []
+    try:
+        resp = requests.get(
+            f"https://api.ebird.org/v2/ref/hotspot/{region_code}",
+            params={"fmt": "json"},
+            headers={"X-eBirdApiToken": EBIRD_API_KEY},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+        return [
+            {
+                "locId": h.get("locId", ""),
+                "locName": h.get("locName", "Unknown"),
+                "lat": h.get("lat"),
+                "lng": h.get("lng"),
+                "latestObsDt": h.get("latestObsDt", ""),
+                "numSpeciesAllTime": h.get("numSpeciesAllTime", 0),
+            }
+            for h in raw
+            if h.get("lat") and h.get("lng")
+        ]
+    except Exception as exc:
+        logger.warning("eBird region hotspot fetch failed (%s). Falling back to geo endpoint.", exc)
+        b = ARIZONA_BOUNDS
+        lat_c = (b["min_lat"] + b["max_lat"]) / 2
+        lng_c = (b["min_lon"] + b["max_lon"]) / 2
+        return fetch_hotspots(lat_c, lng_c, dist_km=50)
+
+@lru_cache(maxsize=4)
+def fetch_hotspots(lat: float, lng: float, dist_km: int = 30) -> List[dict]:
+    """
+    Return eBird hotspots within dist_km of the given coordinates.
+    """
+    if not EBIRD_API_KEY:
+        return []
+    try:
+        resp = requests.get(
+            "https://api.ebird.org/v2/ref/hotspot/geo",
+            params={"lat": lat, "lng": lng, "dist": dist_km, "fmt": "json"},
+            headers={"X-eBirdApiToken": EBIRD_API_KEY},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+        return [
+            {
+                "locId": h.get("locId", ""),
+                "locName": h.get("locName", "Unknown"),
+                "lat": h.get("lat"),
+                "lng": h.get("lng"),
+                "latestObsDt": h.get("latestObsDt", ""),
+                "numSpeciesAllTime": h.get("numSpeciesAllTime", 0),
+            }
+            for h in raw
+            if h.get("lat") and h.get("lng")
+        ]
+    except Exception as exc:
+        logger.warning("eBird hotspot fetch failed (%s).", exc)
+        return []
+
+@lru_cache(maxsize=4096)
+def fetch_hotspot_species(loc_id: str) -> tuple:
+    """Return all-time species codes for an eBird hotspot."""
+    if not EBIRD_API_KEY:
+        return ()
+    try:
+        resp = requests.get(
+            f"https://api.ebird.org/v2/product/spplist/{loc_id}",
+            headers={"X-eBirdApiToken": EBIRD_API_KEY},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return tuple(data) if isinstance(data, list) else ()
+    except Exception as exc:
+        logger.warning("eBird spplist fetch failed for %s (%s).", loc_id, exc)
+        return ()
 
 if __name__ == "__main__":
     # Test locations
