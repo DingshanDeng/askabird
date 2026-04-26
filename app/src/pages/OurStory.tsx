@@ -1,4 +1,4 @@
-import { Telescope, Database, MapPin, Bird, MousePointerClick, MessageCircle, Sparkles } from "lucide-react";
+import { Telescope, Database, MapPin, Bird, Sparkles, Globe } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import desertHero from "@/assets/desert-hero.jpg";
 
@@ -41,7 +41,8 @@ export default function OurStory() {
       </section>
 
       {/* Inspiration */}
-      <section className="container py-16 md:py-20">
+      <section className="bg-muted/40 border-y border-border">
+      <div className="container py-16 md:py-20">
         <div className="mx-auto max-w-3xl space-y-6">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[image:var(--gradient-sunset)] text-primary-foreground shadow-[var(--shadow-warm)]">
@@ -59,8 +60,8 @@ export default function OurStory() {
             </p>
             <p>
               However, we realized a striking irony: while we are obsessed with finding signs of
-              life on other worlds, the rapid expansion of our own cities is threatening the
-              "habitable zones" of our avian neighbors right here in{" "}
+              life on other worlds, the rapid expansion of urban areas is also occupying the
+              "habitable zones" of our wildlife neighbors right here in{" "}
               <span className="font-medium text-foreground">Tucson, Arizona</span>. We decided to
               take the same data-driven rigor we use for the cosmos and apply it to our own
               backyard.
@@ -68,9 +69,55 @@ export default function OurStory() {
             <p className="border-l-4 border-terracotta pl-5 italic text-foreground/80">
               AskABird was born from a simple question:{" "}
               <span className="not-italic font-medium">
-                What would a Cactus Wren think if a power plant was built in its home?
+                What would a Cactus Wren think if a new construction was built in its home?
               </span>{" "}
-              Before we find life in the stars, we can use technology to protect it on Earth.
+              Before we find life in the stars, we should respect and protect the lifes in our surrounding.
+            </p>
+          </div>
+        </div>
+      </div>
+      </section>
+
+      {/* Why Birds? */}
+      <section className="container py-16 md:py-20">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-saguaro/15 text-saguaro shadow-[var(--shadow-soft)]">
+              <Globe className="h-5 w-5" />
+            </span>
+            <h2 className="font-serif text-2xl md:text-3xl font-semibold text-foreground">
+              Why Birds?
+            </h2>
+          </div>
+          <div className="space-y-4 text-foreground/90 leading-relaxed text-[1.05rem]">
+            <p>
+              Tucson and southeastern Arizona sit at one of the most remarkable
+              ecological crossroads on Earth. The{" "}
+              <span className="font-medium text-foreground">Sky Islands</span> — a chain
+              of mountain ranges rising from the Sonoran Desert — funnel species from the
+              Rocky Mountains, the Sierra Madre, and the Mexican tropics into a single
+              region. The result: southeastern Arizona regularly records{" "}
+              <span className="font-medium text-foreground">
+                more than 500 bird species
+              </span>
+              , roughly half of every species found in all of North America, making it one
+              of the premier destinations for birds and birders on the continent.
+            </p>
+            <p>
+              But birds aren't just a draw for wildlife enthusiasts. They are the{" "}
+              <span className="font-medium text-foreground">
+                most commonly encountered wildlife
+              </span>{" "}
+              for the vast majority of people. They are spotted from a kitchen window, heard on a
+              morning walk, or noticed perched on a fence in a parking lot. That everyday
+              familiarity makes birds a uniquely powerful bridge: they connect ordinary
+              people to the health of ecosystems they might otherwise never think about.
+            </p>
+            <p className="border-l-4 border-saguaro pl-5 italic text-foreground/80">
+              When a neighborhood loses its birds, it loses a canary in the coal mine.
+              Bird populations are among the most sensitive and well-documented indicators
+              of ecosystem change, which is exactly why we built AskABird around them.
+              If you can hear the desert, you can protect it.
             </p>
           </div>
         </div>
@@ -133,55 +180,8 @@ export default function OurStory() {
         </div>
       </section>
 
-      {/* How to use */}
-      <section className="container py-16 md:py-20">
-        <div className="mx-auto max-w-3xl text-center space-y-3 mb-10">
-          <h2 className="font-serif text-2xl md:text-3xl font-semibold text-foreground">
-            How to use AskABird
-          </h2>
-          <p className="text-muted-foreground">Three steps. No setup. Just curiosity.</p>
-        </div>
-        <div className="mx-auto max-w-4xl grid gap-5 md:grid-cols-3">
-          {[
-            {
-              n: 1,
-              icon: Bird,
-              title: "Pick a bird friend",
-              body:
-                "Choose a local Sonoran species — like the Cactus Wren or Greater Roadrunner — to be your guide.",
-            },
-            {
-              n: 2,
-              icon: MousePointerClick,
-              title: "Click any spot on the Tucson map",
-              body:
-                "Drop a pin where you're curious or where a project might go. We'll fetch the local bird story.",
-            },
-            {
-              n: 3,
-              icon: MessageCircle,
-              title: "Watch history unfold and chat",
-              body:
-                "See nearby sightings, the impact score, and ask the bird anything about that place.",
-            },
-          ].map(({ n, icon: Icon, title, body }) => (
-            <div
-              key={n}
-              className="relative rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]"
-            >
-              <div className="absolute -top-3 -left-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[image:var(--gradient-sunset)] text-primary-foreground font-bold text-sm shadow-[var(--shadow-warm)]">
-                {n}
-              </div>
-              <Icon className="h-6 w-6 text-saguaro mb-3" />
-              <h3 className="font-serif text-lg font-semibold mb-1.5">{title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Math callout */}
-      <section className="container pb-20">
+      <section className="container pt-16 pb-20">
         <div className="mx-auto max-w-2xl">
           <div className="relative rounded-2xl border border-border bg-[hsl(var(--sand)/0.25)] p-8 md:p-10 text-center shadow-[var(--shadow-soft)]">
             <div className="inline-flex items-center gap-2 rounded-full bg-card px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground border border-border mb-5">
