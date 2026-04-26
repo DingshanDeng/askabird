@@ -1,58 +1,118 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
-## Running the App
+## Active Codebase
 
-Both services must run simultaneously in separate terminals:
+The live app is in **`ask_a_bird_lovable/`** — a React/Vite/TypeScript SPA backed by Supabase Edge Functions.
+
+The old Python/FastAPI/Streamlit stack (`backend/`, `frontend/app.py`) is archived in `archive/`.
+
+---
+
+## Running Locally
 
 ```bash
-# Terminal 1 — backend (FastAPI on :8000)
-uvicorn backend.main:app --reload --port 8000
-
-# Terminal 2 — frontend (Streamlit on :8501)
-streamlit run frontend/app.py
+cd ask_a_bird_lovable
+npm install          # first time only
+npm run dev          # Vite dev server at http://localhost:8080
 ```
 
-Install dependencies:
+The frontend connects to the hosted Supabase project (credentials already in `ask_a_bird_lovable/.env`). No local backend process is needed for basic development.
+
+### Running Edge Functions locally (optional)
+
 ```bash
-pip install -r requirements.txt
+# Requires Supabase CLI: https://supabase.com/docs/guides/cli
+supabase start
+supabase functions serve
 ```
 
-Copy and edit the env file (all keys are optional — app runs on mock data without them):
-```bash
-cp .env.example .env
+Set function secrets in `supabase/functions/.env`:
+```
+GEMINI_API_KEY=...
+EBIRD_API_KEY=...
 ```
 
-There is no test suite. Manual testing is done via the Streamlit UI at http://localhost:8501 or via the FastAPI interactive docs at http://localhost:8000/docs.
+---
 
 ## Architecture
 
-The app has two independent processes that communicate over HTTP:
+**`ask_a_bird_lovable/src/`** — React SPA (Vite + TypeScript + Tailwind + shadcn/ui)
 
-**`frontend/app.py`** — Streamlit single-page app. Renders a Folium map of Tucson, AZ. On map click, it calls `POST /predict` on the backend, then immediately calls `POST /chat` to generate a bird response. Session state (`st.session_state`) holds all UI state: placed markers, optimal sites, chat history, and the running ecological credit score.
+| File | Purpose |
+|---|---|
+| `pages/Index.tsx` | Main "Ask a Bird" page: map + bird chat |
+| `pages/Optimize.tsx` | Construction planner: drop site, score impact, get alternatives |
+| `pages/OurStory.tsx` | About page |
+| `components/MapView.tsx` | Leaflet map with biodiversity/endangered/migratory overlays |
+| `components/BirdChat.tsx` | Streaming chat UI — calls `bird-chat` Edge Function via SSE |
+| `components/BirdCombobox.tsx` | Searchable bird species picker (calls `nearby-birds`) |
+| `components/ImpactResult.tsx` | Renders biodiversity impact scores and criteria breakdown |
+| `hooks/useRegionBiodiversity.ts` | Fetches 15×15 heatmap grid from `region-biodiversity` |
+| `integrations/supabase/client.ts` | Supabase JS client (reads VITE_SUPABASE_* env vars) |
 
-**`backend/main.py`** — FastAPI app with three endpoints: `/predict`, `/optimize`, `/chat`. On startup (`lifespan`), it pre-warms the Random Forest model via `get_model()` which is `@lru_cache`-wrapped and trains once per process. The `/chat` endpoint tries OpenAI GPT-4o-mini first and falls back to a rule-based template.
+**`ask_a_bird_lovable/supabase/functions/`** — Deno/TypeScript Edge Functions
 
-**`backend/ml_model.py`** — Trains a Random Forest on bird sighting data. `predict_impact()` predicts a baseline biodiversity stability score (0–1) for a location, then applies a construction-type multiplier from `CONSTRUCTION_IMPACT` in config. `find_optimal_sites()` grids the Tucson bounding box into cells and returns the least-damaging locations.
+| Function | Purpose |
+|---|---|
+| `bird-chat` | Streams Gemini response in first-person bird persona |
+| `analyze-site` | eBird + biodiversity scoring for a proposed construction site |
+| `region-biodiversity` | Returns 15×15 grid of species/endangered/migratory data |
+| `nearby-birds` | eBird species lookup for a lat/lon |
+| `suggest-alternatives` | Finds lower-impact construction sites nearby |
+| `_shared/biodiversity.ts` | Shared constants: sensitive species list, construction profiles, scoring |
 
-**`backend/data_ingestion.py`** — `load_sightings()` fetches from the eBird API when `EBIRD_API_KEY` is set, otherwise falls back to `mock_data.generate_sightings()`. Both functions are `@lru_cache`-wrapped (cache lasts for the process lifetime).
-
-**`backend/config.py`** — All domain constants: `TUCSON_BOUNDS`, `CONSTRUCTION_TYPES`, `CONSTRUCTION_IMPACT` multipliers, and `OFFSET_STRUCTURES` with their ecological recovery weights.
-
-**`backend/mock_data.py`** — Synthetic Tucson power plant locations and helper functions (`_dist_to_points`, `_road_density`, `_building_density`) used as feature generators when real OSM data is unavailable.
+---
 
 ## Key Design Decisions
 
-- The ML model is trained from scratch every cold start (takes ~1–2 seconds). There is no model persistence to disk.
-- The eBird API is queried for a 30km radius around Tucson center; the response is cached for the process lifetime.
-- `stability_score` target is derived synthetically from feature values when not present in the eBird data (see `_enrich_features` in `ml_model.py`).
-- The frontend duplicates `CONSTRUCTION_TYPES` and `TUCSON_BOUNDS` from config — these are not imported from the backend.
+- **Streaming chat**: `BirdChat.tsx` reads raw SSE from the `bird-chat` Edge Function and parses OpenAI-format `data:` chunks. Do not change the parse logic without also updating the edge function's response format.
+- **Region heatmap debounce**: `useRegionBiodiversity` quantizes lat/lon to 0.1° buckets and debounces map pan events (600 ms in `MapView.tsx`) to avoid spamming the edge function.
+- **AI model**: `bird-chat` uses Google Gemini via the OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`). Model is `gemini-2.0-flash` by default; override with `GEMINI_MODEL` secret.
+- **eBird fallback**: `analyze-site` falls back to synthetic Sonoran species data when `EBIRD_API_KEY` is absent or eBird returns no results.
+- **Auth**: Supabase Auth is wired up (`useAuth`, `pages/Auth.tsx`). The `sites` table requires `user_id` to save. Anonymous users can still explore and analyze.
+
+---
 
 ## Environment Variables
 
+### Frontend (`.env` in `ask_a_bird_lovable/`)
 | Variable | Purpose |
 |---|---|
-| `EBIRD_API_KEY` | eBird API v2 token; omit to use synthetic sightings |
-| `OPENAI_API_KEY` | GPT-4o-mini for bird chat; omit for rule-based responses |
-| `BACKEND_URL` | FastAPI base URL read by Streamlit (default: `http://localhost:8000`) |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/public key |
+
+### Edge Function secrets (set via `supabase secrets set KEY=value`)
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Google AI Studio key — required for bird chat |
+| `GEMINI_MODEL` | Override model (default: `gemini-2.0-flash`) |
+| `EBIRD_API_KEY` | eBird API v2 token — optional, falls back to synthetic data |
+
+---
+
+## Deploying Edge Functions
+
+```bash
+# Deploy a single function after editing
+supabase functions deploy bird-chat
+
+# Deploy all functions
+supabase functions deploy
+```
+
+## Building for Production
+
+```bash
+cd ask_a_bird_lovable
+npm run build     # output in dist/
+```
+
+See `plan.md` for AWS deployment options (Amplify vs S3+CloudFront).
+
+---
+
+## No Test Suite
+
+Manual testing is done via the browser at http://localhost:8080.
