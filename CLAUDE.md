@@ -69,7 +69,7 @@ EBIRD_API_KEY=...
 
 - **Streaming chat**: `BirdChat.tsx` reads raw SSE from the `bird-chat` Edge Function and parses OpenAI-format `data:` chunks. Do not change the parse logic without also updating the edge function's response format.
 - **Region heatmap debounce**: `useRegionBiodiversity` quantizes lat/lon to 0.1° buckets and debounces map pan events (600 ms in `MapView.tsx`) to avoid spamming the edge function.
-- **AI model**: `bird-chat` uses Google Gemini via the OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`). Model is `gemini-2.0-flash` by default; override with `GEMINI_MODEL` secret.
+- **AI model**: `bird-chat` uses **Gemma 4** via the Google Cloud Gemini API native SSE endpoint (`generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent`). The model is set via the `GEMINI_MODEL` Supabase secret (currently Gemma 4). Note: this uses the **native** Gemini endpoint, not the OpenAI-compatible proxy.
 - **eBird fallback**: `analyze-site` falls back to synthetic Sonoran species data when `EBIRD_API_KEY` is absent or eBird returns no results.
 - **Auth**: Supabase Auth is wired up (`useAuth`, `pages/Auth.tsx`). The `sites` table requires `user_id` to save. Anonymous users can still explore and analyze.
 
@@ -87,7 +87,7 @@ EBIRD_API_KEY=...
 | Variable | Purpose |
 |---|---|
 | `GEMINI_API_KEY` | Google AI Studio key — required for bird chat |
-| `GEMINI_MODEL` | Override model (default: `gemini-2.0-flash`) |
+| `GEMINI_MODEL` | Model name served via Gemini API (currently Gemma 4) |
 | `EBIRD_API_KEY` | eBird API v2 token — optional, falls back to synthetic data |
 
 ---
