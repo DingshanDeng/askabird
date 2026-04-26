@@ -220,3 +220,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local deployment guide (contains credentials)
+webdeployguide.md
+CLAUDE.md
+
