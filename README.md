@@ -1,105 +1,101 @@
-# 🐦 AskABird
+# AskABird
 
 > *What would a bird think?*
 
-AskABird is an AI-powered web app that predicts the **biodiversity impact** of
-human construction (energy/power plants, roads, buildings) and lets you chat
-with an AI from a local bird's perspective.
+AskABird is a web app that lets you explore bird biodiversity across Tucson, AZ — and chat with a local bird species about any spot on the map. Drop a proposed construction site and it scores the biodiversity impact, finds safer nearby alternatives, and lets you hear from the bird neighbors directly.
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| 🗺️ Interactive Map | Click to drop structures on a Folium map of Tucson, AZ |
-| 🤖 ML Impact Model | Random Forest predicts biodiversity stability score (0–1) |
-| 💬 Bird Chat | LLM (GPT-4o-mini) or rule-based AI responds as a local Sonoran bird |
-| 🔍 Site Optimizer | Grids region into 20×20 cells, returns top-3 lowest-impact sites |
-| 🌿 Offset Suggestions | Suggests Urban Forest, Wetland Restoration etc. to offset damage |
-| 📊 Balance Sheet | Running Ecological Credit score tracks cumulative impact |
+| Interactive Map | Leaflet map of Tucson with biodiversity, endangered species, and migration heatmap overlays |
+| Bird Chat | Click any spot and chat with a local Sonoran bird powered by Google Gemini |
+| Construction Impact Scorer | Drop a site, pick a construction type, get a biodiversity safety score (0–1) |
+| Safer Alternatives | Scans nearby cells and surfaces lower-impact construction spots |
+| Species Picker | Bird chips + searchable combobox using live eBird data for the clicked location |
+
+## Stack
+
+- **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui + Leaflet
+- **Backend**: Supabase Edge Functions (Deno/TypeScript)
+- **AI**: Google Gemini (`gemini-2.0-flash`) via OpenAI-compatible streaming API
+- **Bird data**: eBird API v2 (falls back to synthetic Sonoran species data)
 
 ## Quick Start
 
-### 1. Install dependencies
-
 ```bash
-pip install -r requirements.txt
+cd ask_a_bird_lovable
+npm install
+npm run dev
+# open http://localhost:8080
 ```
 
-### 2. Configure environment (optional)
+The `.env` file is already configured with the hosted Supabase credentials — no additional setup needed for local development.
 
-```bash
-cp .env.example .env
-# Add your EBIRD_API_KEY and OPENAI_API_KEY (both optional – mock data is used when absent)
+## Environment Variables
+
+### Frontend (`ask_a_bird_lovable/.env`)
+```
+VITE_SUPABASE_URL=https://...supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
 ```
 
-### 3. Start the backend
-
+### Supabase Edge Function secrets
 ```bash
-uvicorn backend.main:app --reload --port 8000
+supabase secrets set GEMINI_API_KEY=your_google_ai_studio_key
+supabase secrets set EBIRD_API_KEY=your_ebird_key   # optional
 ```
 
-### 4. Start the frontend (new terminal)
-
-```bash
-streamlit run frontend/app.py
-```
-
-Open http://localhost:8501 in your browser.
+Get a Gemini API key at https://aistudio.google.com/apikey
 
 ## Architecture
 
 ```
-┌─────────────────────┐       HTTP/REST        ┌───────────────────────┐
-│  Streamlit Frontend │ ─────────────────────► │  FastAPI Backend       │
-│  frontend/app.py    │                        │  backend/main.py       │
-│                     │                        │                        │
-│  • Folium map       │ ◄───────────────────── │  /predict              │
-│  • Chat sidebar     │   JSON responses       │  /optimize             │
-│  • Balance sheet    │                        │  /chat                 │
-└─────────────────────┘                        └───────────┬───────────┘
-                                                           │
-                                               ┌───────────▼───────────┐
-                                               │  ML Model              │
-                                               │  backend/ml_model.py   │
-                                               │  Random Forest         │
-                                               └───────────┬───────────┘
-                                                           │
-                                               ┌───────────▼───────────┐
-                                               │  Data Ingestion        │
-                                               │  backend/data_ingestion│
-                                               │  eBird + OSM (mock)    │
-                                               └───────────────────────┘
+┌────────────────────────────────────┐
+│  React SPA (Vite, port 8080)       │
+│  ask_a_bird_lovable/src/           │
+│                                    │
+│  pages/Index.tsx    — bird chat    │
+│  pages/Optimize.tsx — impact score │
+│  components/MapView.tsx            │
+│  components/BirdChat.tsx           │
+└────────────┬───────────────────────┘
+             │ Supabase JS client
+             ▼
+┌────────────────────────────────────┐
+│  Supabase Edge Functions (Deno)    │
+│  supabase/functions/               │
+│                                    │
+│  bird-chat          → Gemini API   │
+│  analyze-site       → eBird API    │
+│  region-biodiversity→ eBird + cache│
+│  nearby-birds       → eBird API    │
+│  suggest-alternatives              │
+└────────────────────────────────────┘
 ```
 
-## API Reference
+## Deploying
 
-### `POST /predict`
-```json
-{ "lat": 32.22, "lon": -110.97, "construction_type": "power_plant" }
+### Edge Functions
+```bash
+supabase functions deploy bird-chat
+supabase functions deploy   # all functions
 ```
-Returns biodiversity stability scores before/after construction + offset suggestions.
 
-### `POST /optimize`
-```json
-{ "min_lat": 32.05, "max_lat": 32.35, "min_lon": -111.10, "max_lon": -110.75, "construction_type": "power_plant" }
-```
-Returns the 3 grid cells with the lowest negative impact.
+### Frontend (AWS — see plan.md for full options)
 
-### `POST /chat`
-```json
-{ "lat": 32.22, "lon": -110.97, "construction_type": "power_plant", "baseline_score": 0.72, "impact_score": 0.41, "delta": -0.31, "impact_pct": -43.1, "offsets": [...], "user_message": "What do you think?" }
+**Amplify (easiest)**
+Connect the repo in Amplify, set build command to `cd ask_a_bird_lovable && npm run build`, output dir to `ask_a_bird_lovable/dist`, and add the `VITE_SUPABASE_*` env vars.
+
+**S3 + CloudFront**
+```bash
+npm run build          # dist/
+aws s3 sync dist/ s3://your-bucket --delete
+# CloudFront: add 403/404 → index.html error page for SPA routing
 ```
-Returns a bird-perspective narrative response.
 
 ## Data Sources
 
-- **Bird sightings**: [eBird API](https://ebird.org/science/use-ebird-data/) (falls back to synthetic data)
-- **Infrastructure**: [OpenStreetMap Overpass API](https://overpass-api.de/) (falls back to synthetic data)
-
-## Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `EBIRD_API_KEY` | eBird API v2 token | mock data used |
-| `OPENAI_API_KEY` | OpenAI API key for GPT-4o-mini | rule-based responses |
-| `BACKEND_URL` | FastAPI server URL | `http://localhost:8000` |
+- [eBird API v2](https://ebird.org/science/use-ebird-data/) — recent bird sightings
+- [OpenStreetMap](https://www.openstreetmap.org/) — map tiles
+- Synthetic Sonoran Desert species data — fallback when eBird is unavailable

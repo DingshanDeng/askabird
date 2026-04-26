@@ -1,72 +1,71 @@
-# AskABird — Development Roadmap
+# AskABird — Plan
 
-## Current state (MVP)
+## Current State
 
-- FastAPI backend with `/predict`, `/optimize`, `/chat`, `/hotspots`, `/species-grid`
-- Streamlit frontend: Folium map, construction impact prediction, bird chat (GPT-4o-mini or rule-based)
-- Random Forest model trained on eBird sightings (real or synthetic fallback)
-- Species diversity heatmap: zoom-adaptive grid, time-period selector (1 month / 3 / 6 / 12)
+React/Vite/TypeScript single-page app (in `ask_a_bird_lovable/`) backed by Supabase Edge Functions (Deno/TypeScript). The old Python/FastAPI/Streamlit stack is archived.
 
----
+**Pages:**
+- `/` — Ask a Bird: Leaflet map + bird chat sidebar. Click any spot, pick a species, ask it about the location.
+- `/optimize` — Construction Plan: drop a proposed structure, score biodiversity impact, get safer alternatives.
+- `/our-story` — About page.
 
-## Planned features
-
-### 1. Historical construction impact wrapper
-
-**Goal:** Correlate *past* construction events with observable changes in bird diversity over time.
-
-- Ingest a dataset of historical construction events (lat/lon, type, date) for the Tucson area
-  - Sources: city permit data, OpenStreetMap edit history, satellite change-detection
-- For each construction event, compute:
-  - Baseline diversity score (grid cell) in the 6–12 months *before* the event
-  - Post-construction diversity score at 3 / 6 / 12 months after
-  - Delta and trend line
-- Expose a timeline slider in the frontend so users can scrub through years and watch the heatmap evolve
-- Add a "construction overlay" layer showing historical structures color-coded by age
-
-### 2. Migration vs. resident bird classification
-
-**Goal:** Split species richness into two ecologically distinct signals.
-
-- **Resident species**: present year-round (e.g. Gambel's Quail, Cactus Wren, Gila Woodpecker)
-  - More sensitive to permanent habitat loss (buildings, highways)
-  - Stable across seasons; changes signal long-term degradation
-- **Migratory species**: seasonal visitors passing through or wintering (e.g. warblers, flycatchers)
-  - More sensitive to stopover habitat quality and corridor fragmentation
-  - Strong seasonal signal; changes indicate loss of staging habitat
-
-**Implementation steps:**
-- Add a `bird_type` column (`resident` / `migrant` / `unknown`) to the sightings data
-  - Source: eBird taxonomy + eBird species status API, or a static lookup table seeded from Cornell Lab data
-- Split the `/species-grid` response into `resident_count` and `migrant_count` per cell
-- Frontend: toggle between three heatmap modes — All species / Residents only / Migrants only
-- Update the ML model features to use resident vs. migrant richness separately (two targets or two-output model)
-- Bird chat: have the LLM identify itself as a resident or migratory species based on context
-
-### 3. Time-series diversity trend chart
-
-**Goal:** Show how diversity in a clicked cell has changed over time, not just a snapshot.
-
-- On cell click, fetch monthly species counts for the past 1–3 years
-- Display a sparkline / bar chart below the map
-- Overlay construction event markers on the timeline to visualise cause and effect
-
-### 4. eBird extended history (beyond 30-day API limit)
-
-The eBird API's recent-observations endpoint caps at 30 days. For longer windows:
-
-- Apply for eBird Basic Dataset (EBD) access at https://ebird.org/science/use-ebird-data/
-- Alternatively, use the eBird Status & Trends API (requires separate credentials) for species occurrence probability maps by week
-- Until then, periods > 30 days use synthetic mock data filtered by day-of-year
+**Supabase Edge Functions:**
+- `bird-chat` — Streams AI bird persona replies (migrating to Gemini/Gemma4)
+- `analyze-site` — eBird + biodiversity scoring for a proposed construction site
+- `region-biodiversity` — 15×15 heatmap grid (biodiversity / endangered / migratory layers)
+- `nearby-birds` — eBird species lookup for a location
+- `suggest-alternatives` — Scans surrounding area for lower-impact construction sites
 
 ---
 
-## Data sources to integrate
+## Step 1 — Gemini/Gemma4 API Integration (Next)
 
-| Source | Data | Status |
-|---|---|---|
-| eBird API v2 | Recent sightings (≤30 days), hotspots | Integrated |
-| eBird Basic Dataset (EBD) | Full historical sightings | Pending access |
-| OpenStreetMap / Overpass | Current infrastructure | Integrated (mock fallback) |
-| City of Tucson open data | Building/permit history | Not started |
-| USGS NLCD | Land cover change rasters | Not started |
+**Goal:** Replace the Lovable AI gateway in `bird-chat` with Google Gemini directly.
+
+### What changes
+- `supabase/functions/bird-chat/index.ts`: replace `LOVABLE_API_KEY` + Lovable gateway URL with `GEMINI_API_KEY` + Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`).
+- Model: `gemini-2.0-flash` by default; override via `GEMINI_MODEL` Supabase secret.
+- Frontend (`BirdChat.tsx`) is **unchanged** — the OpenAI streaming format is the same.
+
+### How to activate
+1. Get a key at https://aistudio.google.com/apikey
+2. Set the secret in Supabase:
+   ```bash
+   supabase secrets set GEMINI_API_KEY=your_key_here
+   # optional: GEMINI_MODEL=gemini-2.0-flash
+   ```
+3. Deploy the edge function:
+   ```bash
+   supabase functions deploy bird-chat
+   ```
+
+---
+
+## Step 2 — AWS Deployment
+
+**Goal:** Host the static frontend on AWS; keep Supabase as the backend for now.
+
+### Option A — AWS Amplify (simplest)
+1. Connect the GitHub repo to Amplify.
+2. Set build command: `cd ask_a_bird_lovable && npm run build` and output dir: `ask_a_bird_lovable/dist`.
+3. Set env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) in Amplify console.
+4. Amplify handles CI/CD, CDN, and custom domain automatically.
+
+### Option B — S3 + CloudFront (standard)
+1. Build: `cd ask_a_bird_lovable && npm run build` → output in `dist/`.
+2. Upload `dist/` to an S3 bucket (static website hosting enabled).
+3. Create a CloudFront distribution pointing at the S3 bucket; set default root object to `index.html`; add a 403/404 → `index.html` error page rule (for SPA routing).
+4. Set env vars at build time or bake them into the bundle.
+
+### Option C — Full AWS (future)
+Migrate Supabase Edge Functions to AWS Lambda + API Gateway. Use RDS/DynamoDB instead of Supabase Postgres. Use Secrets Manager for API keys. Required only if you need to stay fully within AWS.
+
+---
+
+## Future Features
+
+- **Resident vs. migratory bird split** — separate heatmap modes and ML features
+- **Historical construction impact** — timeline slider showing pre/post-construction diversity changes
+- **Time-series trend chart** — sparkline of monthly species counts per clicked cell
+- **eBird Extended Dataset** — apply for EBD access for >30-day historical windows
+- **Auth-gated balance sheet** — save and compare multiple sites across sessions
