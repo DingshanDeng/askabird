@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMapState } from "@/contexts/MapContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Target, MapPin, Loader2, Sparkles, ArrowRight, ThumbsUp, MessageCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
-import MapView, { TUCSON_CENTER, type SitePin, type Suggestion } from "@/components/MapView";
+import MapView, { type SitePin, type Suggestion } from "@/components/MapView";
 import ImpactResult, { type AnalysisResult } from "@/components/ImpactResult";
 import BirdChat, { type SiteContext } from "@/components/BirdChat";
 
@@ -25,7 +26,11 @@ const CONSTRUCTION_TYPES = [
 export default function Optimize() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [proposed, setProposed] = useState<{ lat: number; lon: number } | null>(null);
+  const { sharedPin, setSharedPin, sharedCenter, setSharedCenter, sharedZoom, setSharedZoom } = useMapState();
+  const proposed = sharedPin;
+  const setProposed = setSharedPin;
+  const viewCenter = sharedCenter;
+  const setViewCenter = setSharedCenter;
   const [type, setType] = useState("building");
   const [history, setHistory] = useState<SitePin[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -34,12 +39,6 @@ export default function Optimize() {
   const [saved, setSaved] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  // Viewport center — drives heatmap fetches and updates as the user pans
-  // so they can plan beyond the Tucson area.
-  const [viewCenter, setViewCenter] = useState<{ lat: number; lon: number }>({
-    lat: TUCSON_CENTER[0],
-    lon: TUCSON_CENTER[1],
-  });
 
   // Use the proposed point if there is one, otherwise the panned viewport.
   const regionLat = proposed?.lat ?? viewCenter.lat;
@@ -377,8 +376,8 @@ export default function Optimize() {
           <Card className="overflow-hidden shadow-[var(--shadow-soft)]">
             <div className="h-[calc(100vh-14rem)] min-h-[420px] relative">
               <MapView
-                center={proposed ? [proposed.lat, proposed.lon] : TUCSON_CENTER}
-                zoom={11}
+                center={proposed ? [proposed.lat, proposed.lon] : [sharedCenter.lat, sharedCenter.lon]}
+                zoom={sharedZoom}
                 proposed={proposed}
                 history={history}
                 suggestions={suggestions}
@@ -388,6 +387,7 @@ export default function Optimize() {
                 region={region}
                 regionLoading={regionLoading}
                 onCenterChange={(lat, lon) => setViewCenter({ lat, lon })}
+                onZoomChange={setSharedZoom}
                 onRefreshRegion={refresh}
               />
               {!proposed && (

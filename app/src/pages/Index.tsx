@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useMapState } from "@/contexts/MapContext";
 import { Card } from "@/components/ui/card";
 import { Bird, MapPin, ChevronDown, Check, Loader2 } from "lucide-react";
 import MapView, { TUCSON_CENTER } from "@/components/MapView";
@@ -37,15 +38,15 @@ const CACTUS_WREN_GREETING =
   "Chirp! Welcome to Ask a Bird — I'm your Cactus Wren guide! 🌵 Click anywhere on the map to chat with the local bird at that spot, or tap my photo above to switch who you're talking to. Flip on the heatmap layers in the top-right to see where the biodiversity hotspots are. Ask me anything!";
 
 export default function Index() {
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const { sharedPin, setSharedPin, sharedCenter, setSharedCenter, sharedZoom, setSharedZoom } = useMapState();
+  const location = sharedPin;
+  const setLocation = setSharedPin;
+  const viewCenter = sharedCenter;
+  const setViewCenter = setSharedCenter;
   const [birdSpecies, setBirdSpecies] = useState<string>(TUCSON_DEFAULT_BIRDS[0].name);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nearbyBirds, setNearbyBirds] = useState<NearbyBird[]>([]);
   const [loadingNearby, setLoadingNearby] = useState(false);
-  const [viewCenter, setViewCenter] = useState<{ lat: number; lon: number }>({
-    lat: TUCSON_CENTER[0],
-    lon: TUCSON_CENTER[1],
-  });
 
   const activeLat = location?.lat ?? TUCSON_CENTER[0];
   const activeLon = location?.lon ?? TUCSON_CENTER[1];
@@ -54,11 +55,18 @@ export default function Index() {
     viewCenter.lon,
   );
 
+  // Clear stale bird list whenever the location changes so the picker
+  // always starts empty (showing the spinner) at a new spot.
+  useEffect(() => {
+    setNearbyBirds([]);
+  }, [activeLat, activeLon]);
+
   // Fetch recently sighted birds when picker opens
   useEffect(() => {
     if (!pickerOpen) return;
     let cancelled = false;
     setLoadingNearby(true);
+    setNearbyBirds([]);
     (async () => {
       try {
         const { data } = await supabase.functions.invoke("nearby-birds", {
@@ -213,13 +221,14 @@ export default function Index() {
           <Card className="overflow-hidden shadow-[var(--shadow-soft)]">
             <div className="h-[calc(100vh-14rem)] min-h-[420px] relative">
               <MapView
-                center={location ? [location.lat, location.lon] : TUCSON_CENTER}
-                zoom={11}
+                center={location ? [location.lat, location.lon] : [sharedCenter.lat, sharedCenter.lon]}
+                zoom={sharedZoom}
                 proposed={location}
                 onMapClick={(lat, lon) => setLocation({ lat, lon })}
                 region={region}
                 regionLoading={regionLoading}
                 onCenterChange={(lat, lon) => setViewCenter({ lat, lon })}
+                onZoomChange={setSharedZoom}
                 onRefreshRegion={refresh}
               />
               <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-card/95 backdrop-blur border border-border rounded-full px-4 py-1.5 text-xs font-medium shadow-[var(--shadow-soft)] flex items-center gap-1.5 z-[1000]">

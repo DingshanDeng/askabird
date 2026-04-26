@@ -125,6 +125,15 @@ function MoveTracker({ onMove }: { onMove: (lat: number, lon: number) => void })
   return null;
 }
 
+function ZoomTracker({ onZoom }: { onZoom: (zoom: number) => void }) {
+  const map = useMapEvents({
+    zoomend() {
+      onZoom(map.getZoom());
+    },
+  });
+  return null;
+}
+
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
@@ -137,6 +146,7 @@ interface MapViewProps {
   region?: RegionData | null;
   regionLoading?: boolean;
   onCenterChange?: (lat: number, lon: number) => void;
+  onZoomChange?: (zoom: number) => void;
   onRefreshRegion?: () => void;
 }
 
@@ -334,6 +344,7 @@ export default function MapView({
   region = null,
   regionLoading = false,
   onCenterChange,
+  onZoomChange,
   onRefreshRegion,
 }: MapViewProps) {
   const [active, setActive] = useState<Record<LayerKey, boolean>>({
@@ -368,6 +379,7 @@ export default function MapView({
         {onMapClick && <ClickHandler onClick={onMapClick} />}
         {recenterOnCenterChange && <MapRecenter center={center} />}
         {onCenterChange && <MoveTracker onMove={handleMove} />}
+        {onZoomChange && <ZoomTracker onZoom={onZoomChange} />}
 
         {region && active.heatmap && <HeatmapLayer region={region} />}
         {region && active.endangered && <EndangeredLayer region={region} />}
