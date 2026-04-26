@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
-    const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.0-flash";
+    const MODEL = Deno.env.get("GEMINI_MODEL");
+    if (!MODEL) throw new Error("GEMINI_MODEL is not configured");
 
     const otherSpecies = site_context.top_species
       ?.map((s) => s.name)

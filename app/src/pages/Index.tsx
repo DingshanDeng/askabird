@@ -125,9 +125,9 @@ export default function Index() {
               }
               quickReplies={[
                 "What do you eat around here?",
-                "What's the biggest threat to birds in Tucson?",
-                "Are there any endangered birds nearby?",
-                "Tell me about migration season here",
+                // "What's the biggest threat to birds in Tucson?",
+                // "Are there any endangered birds nearby?",
+                // "Tell me about migration season here",
               ]}
             />
           </div>
