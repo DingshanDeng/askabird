@@ -241,7 +241,7 @@ export default function BirdChat({ siteContext, birdSpecies, autoOpener, initial
         </div>
       </div>
 
-      {quickReplies && quickReplies.filter((r) => !usedQuickReplies.has(r)).length > 0 && !loading && messages.some((m) => m.role === "assistant" && !m.hidden) && (
+      {quickReplies && quickReplies.filter((r) => !usedQuickReplies.has(r)).length > 0 && !loading && (messages.length === 0 || messages.some((m) => m.role === "assistant" && !m.hidden)) && (
         <div className="flex flex-wrap gap-2 mt-3">
           {quickReplies.filter((r) => !usedQuickReplies.has(r)).map((reply) => (
             <button
