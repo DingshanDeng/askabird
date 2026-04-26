@@ -7,13 +7,23 @@ EBIRD_API_KEY = os.getenv("EBIRD_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-# Tucson, AZ bounding box
+# Tucson, AZ bounding box (used for ML model training and site optimisation)
 TUCSON_BOUNDS = {
     "min_lat": 32.05,
     "max_lat": 32.35,
     "min_lon": -111.10,
     "max_lon": -110.75,
 }
+
+# Arizona state bounding box (used as default viewport for the species heatmap)
+ARIZONA_BOUNDS = {
+    "min_lat": 31.33,
+    "max_lat": 37.00,
+    "min_lon": -114.82,
+    "max_lon": -109.04,
+}
+
+ARIZONA_CENTER = [34.16, -111.09]  # geographic centre of Arizona
 
 CONSTRUCTION_TYPES = [
     "power_plant",
