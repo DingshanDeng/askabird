@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Target, MapPin, Loader2, Sparkles, ArrowRight, ThumbsUp, MessageCircle } from "lucide-react";
+import { Target, MapPin, Loader2, Sparkles, ArrowRight, ThumbsUp, MessageCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import MapView, { TUCSON_CENTER, type SitePin, type Suggestion } from "@/components/MapView";
 import ImpactResult, { type AnalysisResult } from "@/components/ImpactResult";
@@ -23,6 +24,7 @@ const CONSTRUCTION_TYPES = [
 
 export default function Optimize() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [proposed, setProposed] = useState<{ lat: number; lon: number } | null>(null);
   const [type, setType] = useState("building");
   const [history, setHistory] = useState<SitePin[]>([]);
@@ -204,13 +206,24 @@ export default function Optimize() {
 
           {result && (
             <Card className="shadow-[var(--shadow-soft)] animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-3">
                 <ImpactResult
                   result={result}
                   onSave={user ? handleSave : undefined}
                   saving={saving}
                   saved={saved}
                 />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    const birdSpecies = result.top_species[0]?.name ?? "Cactus Wren";
+                    navigate("/report", { state: { result, birdSpecies } });
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Generate Impact Report
+                </Button>
               </CardContent>
             </Card>
           )}

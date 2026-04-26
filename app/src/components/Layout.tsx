@@ -1,10 +1,11 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Bird, Sparkles, Target } from "lucide-react";
+import { Bird, Sparkles, Target, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", icon: Bird, label: "Ask A Bird" },
   { to: "/optimize", icon: Target, label: "Find a Spot" },
+  { to: "/report", icon: FileText, label: "Site Report" },
   { to: "/our-story", icon: Sparkles, label: "Our Story" },
 ];
 
