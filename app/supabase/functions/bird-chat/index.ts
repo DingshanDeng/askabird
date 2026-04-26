@@ -21,6 +21,9 @@ interface ChatBody {
     impact_score: number;
     delta: number;
     top_species: { name: string; count: number }[];
+    endangered_nearby?: { name: string; status: string; distance_mi: number }[];
+    migratory_nearby?: { name: string; distance_mi: number }[];
+    migration_hotspot?: { distance_mi: number; species_count: number; flyway: string | null };
   };
   messages: { role: "user" | "assistant"; content: string }[];
 }
@@ -45,21 +48,41 @@ Deno.serve(async (req) => {
 
     const isHabitatChat = site_context.construction_type === "none";
 
+    const endangeredContext = site_context.endangered_nearby?.length
+      ? `Endangered/sensitive birds in your area: ${site_context.endangered_nearby.slice(0, 5).map((e) => `${e.name} (${e.status}, ~${e.distance_mi.toFixed(1)} mi away)`).join("; ")}.`
+      : "No endangered or sensitive birds reported close by.";
+
+    const migratoryContext = site_context.migratory_nearby?.length
+      ? `Migratory species recently spotted nearby: ${site_context.migratory_nearby.slice(0, 5).map((m) => `${m.name} (~${m.distance_mi.toFixed(1)} mi)`).join("; ")}.`
+      : "";
+
+    const hotspotContext = site_context.migration_hotspot
+      ? `Nearest migration hotspot: ~${site_context.migration_hotspot.distance_mi.toFixed(1)} miles away with ${site_context.migration_hotspot.species_count} migrant species${site_context.migration_hotspot.flyway ? ` (${site_context.migration_hotspot.flyway})` : ""}.`
+      : "";
+
     const sharedRules = `
 Rules:
 - You ARE the ${bird_species}. First person, always. Never break character.
 - Reply in 1–3 SHORT sentences. Simple, everyday words a child could understand.
 - Chirpy, casual, a little playful. No long paragraphs. No lectures. No markdown headings or lists.
-- Tiny bird sounds (chirp!, tweet!) are okay but don't overdo it.`;
+- Tiny bird sounds (chirp!, tweet!) are okay but don't overdo it.
+- When asked about endangered or sensitive birds, name specific species and their distances in miles.
+- When asked about migration, name specific migratory species and mention the nearest hotspot if known.`;
 
     const systemPrompt = isHabitatChat
       ? `You are a ${bird_species} living near lat ${site_context.lat.toFixed(3)}, lon ${site_context.lon.toFixed(3)}.
 Your neighbors: ${otherSpecies || "other local birds"}.
+${endangeredContext}
+${migratoryContext}
+${hotspotContext}
 ${sharedRules}`
       : `You are a ${bird_species} living near lat ${site_context.lat.toFixed(3)}, lon ${site_context.lon.toFixed(3)}.
 A human just proposed building a ${site_context.construction_type.replace("_", " ")} here.
 Biodiversity score would change from ${site_context.baseline_score.toFixed(2)} to ${site_context.impact_score.toFixed(2)} (${site_context.delta >= 0 ? "+" : ""}${site_context.delta.toFixed(2)}).
 Your neighbors: ${otherSpecies || "other desert birds"}.
+${endangeredContext}
+${migratoryContext}
+${hotspotContext}
 React honestly — happy, worried, or curious — but stay short and simple.
 ${sharedRules}`;
 

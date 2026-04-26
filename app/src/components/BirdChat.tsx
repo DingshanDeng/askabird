@@ -17,6 +17,9 @@ export interface SiteContext {
   impact_score: number;
   delta: number;
   top_species: { name: string; count: number }[];
+  endangered_nearby?: { name: string; status: string; distance_mi: number }[];
+  migratory_nearby?: { name: string; distance_mi: number }[];
+  migration_hotspot?: { distance_mi: number; species_count: number; flyway: string | null };
 }
 
 interface BirdChatProps {
@@ -237,7 +240,7 @@ export default function BirdChat({ siteContext, birdSpecies, autoOpener, initial
               )}
               <div className="bg-muted text-muted-foreground rounded-lg px-3 py-2 text-sm inline-flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                {birdSpecies} is thinking…
+                {birdSpecies} is talking, Gemini translating…
               </div>
             </div>
           )}

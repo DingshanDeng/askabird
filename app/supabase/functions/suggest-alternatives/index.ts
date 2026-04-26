@@ -17,6 +17,7 @@ interface Candidate {
   lat: number;
   lon: number;
   distance_km: number;
+  distance_miles: number;
   baseline: number;
   impact: number;
   delta: number;
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
         lat: p.lat,
         lon: p.lon,
         distance_km: p.distance,
+        distance_miles: Math.round(p.distance * 0.621371 * 10) / 10,
         baseline,
         impact,
         delta: impact - baseline,

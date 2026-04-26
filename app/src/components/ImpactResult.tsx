@@ -205,7 +205,7 @@ export default function ImpactResult({ result, onSave, saving, saved }: Props) {
           <div className="flex flex-wrap gap-1.5">
             {c.endangered.species.map((s) => (
               <Badge key={s.name} variant="outline" className="text-xs">
-                {s.name} · {s.status}
+                {s.name} · {s.status}{s.distance_km !== undefined ? ` · ~${(s.distance_km / 1.609).toFixed(1)} mi` : ""}
               </Badge>
             ))}
           </div>

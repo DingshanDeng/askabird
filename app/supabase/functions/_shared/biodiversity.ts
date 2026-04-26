@@ -78,6 +78,9 @@ export function flywayFor(lat: number, lon: number): string | null {
   return null;
 }
 
+const KM_TO_MI = 0.621371;
+function toMi(km: number): string { return (km * KM_TO_MI).toFixed(1); }
+
 // Haversine distance in km
 export function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -239,14 +242,14 @@ export function evaluate(
   let endangeredNote: string;
   if (sensitiveNearby.length === 0) {
     endangeredNote = nearest
-      ? `No listed birds within 1 mile (nearest: ${nearest.name} at ${nearest.distance_km.toFixed(1)} km).`
+      ? `No listed birds within 1 mile (nearest: ${nearest.name} at ${toMi(nearest.distance_km)} mi).`
       : "No listed or sensitive birds reported in the area.";
   } else {
     const list = sensitiveNearby
-      .slice(0, 2)
-      .map((s) => `${s.name} (~${s.distance_km.toFixed(1)} km)`)
+      .slice(0, 3)
+      .map((s) => `${s.name} (~${toMi(s.distance_km)} mi)`)
       .join(", ");
-    endangeredNote = `${sensitiveNearby.length} listed/sensitive species within 1 mile: ${list}${sensitiveNearby.length > 2 ? "…" : ""}.`;
+    endangeredNote = `${sensitiveNearby.length} listed/sensitive species within 1 mile: ${list}${sensitiveNearby.length > 3 ? "…" : ""}.`;
   }
 
   // === 2. Migratory safety ===
@@ -284,15 +287,17 @@ export function evaluate(
     }
   }
   let migratoryNote: string;
+  const NEARBY_MI = toMi(NEARBY_KM);
   if (!flyway) {
     migratoryNote = "Outside the main Pacific/Central flyways — low migration pressure.";
   } else if (nearbyMigrantCount === 0) {
-    migratoryNote = `Inside the ${flyway} but no migrant species reported within ~${NEARBY_KM} km — low migration pressure.`;
+    migratoryNote = `Inside the ${flyway} but no migrant species reported within ~${NEARBY_MI} mi — low migration pressure.`;
   } else if (nearbyMigrantCount < HIGH_PRESSURE_THRESHOLD) {
-    migratoryNote = `Inside the ${flyway} — only ${nearbyMigrantCount} migrant species within ~${NEARBY_KM} km — low migration pressure.`;
+    const speciesNames = migratorySpeciesNearby.slice(0, 3).map((m) => m.name).join(", ");
+    migratoryNote = `Inside the ${flyway} — ${nearbyMigrantCount} migrant species within ~${NEARBY_MI} mi (${speciesNames}) — low migration pressure.`;
   } else {
-    const lead = migratorySpeciesNearby[0]?.name;
-    migratoryNote = `High migration pressure — ${nearbyMigrantCount} migrant species within ~${NEARBY_KM} km${lead ? ` (incl. ${lead})` : ""}, inside the ${flyway}.`;
+    const speciesNames = migratorySpeciesNearby.slice(0, 4).map((m) => m.name).join(", ");
+    migratoryNote = `High migration pressure — ${nearbyMigrantCount} migrant species within ~${NEARBY_MI} mi including ${speciesNames}, inside the ${flyway}.`;
   }
 
   // === 3. Biodiversity safety ===

@@ -395,7 +395,7 @@ export default function MapView({
             <Popup>
               <div className="text-sm">
                 <strong>Better nearby spot</strong>
-                <div className="text-xs text-muted-foreground mt-1">{s.distance_km} km away</div>
+                <div className="text-xs text-muted-foreground mt-1">{(s.distance_km * 0.621371).toFixed(1)} mi away</div>
                 <div className="text-xs mt-1">{s.reason}</div>
               </div>
             </Popup>

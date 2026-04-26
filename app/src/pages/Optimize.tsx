@@ -23,6 +23,9 @@ const CONSTRUCTION_TYPES = [
   { value: "nuclear_farm", label: "Nuclear plant" },
 ];
 
+const AMBASSADORS = ["Cactus Wren", "Vermilion Flycatcher", "Gambel's Quail", "Greater Roadrunner", "Great Horned Owl"];
+const KM_TO_MI = 0.621371;
+
 export default function Optimize() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -39,6 +42,7 @@ export default function Optimize() {
   const [saved, setSaved] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [ambassadorBird, setAmbassadorBird] = useState<string>("Cactus Wren");
 
   // Use the proposed point if there is one, otherwise the panned viewport.
   const regionLat = proposed?.lat ?? viewCenter.lat;
@@ -78,6 +82,7 @@ export default function Optimize() {
       });
       if (error) throw error;
       setResult({ ...data, lat, lon, construction_type: ctype });
+      setAmbassadorBird(AMBASSADORS[Math.floor(Math.random() * AMBASSADORS.length)]);
 
       // If the site is already a "good spot" (post-construction safety >= 0.6),
       // skip the alternatives lookup — no point searching for somewhere better.
@@ -280,7 +285,7 @@ export default function Optimize() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium flex items-center gap-2">
-                          ~{s.distance_km} km away
+                          ~{(s.distance_km * KM_TO_MI).toFixed(1)} mi away
                           {s.is_good_site && (
                             <span className="text-[10px] uppercase tracking-wide font-semibold text-saguaro">good spot</span>
                           )}
@@ -301,7 +306,7 @@ export default function Optimize() {
           {result && !loadingSuggestions && (() => {
             const isGoodSite = (result as AnalysisResult & { is_good_site?: boolean }).is_good_site
               ?? result.impact_score >= 0.6;
-            const birdSpecies = result.top_species[0]?.name ?? "Cactus Wren";
+            const birdSpecies = ambassadorBird;
             const ctypeLabel = result.construction_type.replace(/_/g, " ");
             const profile = (result as AnalysisResult & { construction_profile?: { main_concern?: string } }).construction_profile;
             const mainConcern = profile?.main_concern;
@@ -312,17 +317,29 @@ export default function Optimize() {
             if (mainConcern) {
               concerns.push(`General: ${mainConcern}.`);
             }
-            if (c?.endangered?.nearby_count && c.endangered.nearby_count > 0 && c.endangered.nearest) {
-              const n = c.endangered.nearest;
-              concerns.push(
-                `Endangered/sensitive nearby: ${n.name} (${n.status}) only ~${n.distance_km?.toFixed(1)} km away.`,
-              );
+            if (c?.endangered?.nearby_count && c.endangered.nearby_count > 0 && c.endangered.species?.length) {
+              const nearbySpecies = c.endangered.species
+                .filter((s) => (s.distance_km ?? Infinity) <= 1.609)
+                .slice(0, 3);
+              if (nearbySpecies.length > 0) {
+                const list = nearbySpecies.map((s) => `${s.name} (~${((s.distance_km ?? 0) * KM_TO_MI).toFixed(1)} mi)`).join(", ");
+                concerns.push(`Endangered/sensitive species within 1 mile: ${list}.`);
+              } else if (c.endangered.nearest) {
+                const n = c.endangered.nearest;
+                concerns.push(`Nearest sensitive species: ${n.name} (${n.status}) ~${((n.distance_km ?? 0) * KM_TO_MI).toFixed(1)} mi away.`);
+              }
             }
-            if (c?.migratory?.hotspot) {
-              const h = c.migratory.hotspot;
-              concerns.push(
-                `Migration hotspot ~${h.distance_km.toFixed(1)} km away with ${h.species_count} migrant species (in the ${c.migratory.flyway}).`,
-              );
+            if (c?.migratory?.species?.length) {
+              const nearbyMig = c.migratory.species.filter((m) => (m.distance_km ?? Infinity) <= 5).slice(0, 4);
+              const migNames = nearbyMig.length > 0
+                ? nearbyMig.map((m) => `${m.name} (~${((m.distance_km ?? 0) * KM_TO_MI).toFixed(1)} mi)`).join(", ")
+                : c.migratory.species.slice(0, 3).map((m) => m.name).join(", ");
+              if (c.migratory.hotspot) {
+                const h = c.migratory.hotspot;
+                concerns.push(`Migration hotspot ~${(h.distance_km * KM_TO_MI).toFixed(1)} mi away; migrant species: ${migNames} (${c.migratory.flyway ?? "flyway"}).`);
+              } else {
+                concerns.push(`Migratory species nearby: ${migNames}.`);
+              }
             }
             if (c?.biodiversity && typeof c.biodiversity.region_avg === "number" &&
                 c.biodiversity.species_count > c.biodiversity.region_avg) {
@@ -334,7 +351,7 @@ export default function Optimize() {
 
             const opener = isGoodSite
               ? `A human is proposing a ${ctypeLabel} where I live. Your analysis says this is a GOOD spot — post-construction safety is ${result.impact_score.toFixed(2)} (above 0.60). As the ${birdSpecies}, greet them warmly, confirm it's a reasonable place, briefly mention the specific risk of a ${ctypeLabel} (${mainConcern ?? "habitat disturbance"}), and encourage them to keep protecting the habitat — minimize lighting, preserve native plants, build carefully — and invite them to ask questions. Keep it under 100 words.`
-              : `A human is proposing a ${ctypeLabel} where I live. Your analysis says this is NOT a good spot — post-construction safety is only ${result.impact_score.toFixed(2)} (below 0.60).${concernsText} As the ${birdSpecies}, greet them, explain the specific risk a ${ctypeLabel} brings (${mainConcern ?? "habitat disturbance"}), name the concerns above (which species, how close, where the migration hotspot is), and gently urge them to move a little farther to one of the suggested safer spots. Invite questions. Keep it under 120 words.`;
+              : `A human is proposing a ${ctypeLabel} where I live. Your analysis says this is NOT a good spot — post-construction safety is only ${result.impact_score.toFixed(2)} (below 0.60).${concernsText} As the ${birdSpecies}, greet them, explain the specific risk a ${ctypeLabel} brings (${mainConcern ?? "habitat disturbance"}), name the concerns above (which species, how close in miles, where the migration hotspot is), and gently urge them to move a little farther to one of the suggested safer spots. Invite questions. Keep it under 120 words.`;
 
             const siteCtx: SiteContext = {
               lat: result.lat,
@@ -344,6 +361,20 @@ export default function Optimize() {
               impact_score: result.impact_score,
               delta: result.delta,
               top_species: result.top_species,
+              endangered_nearby: c?.endangered?.species?.slice(0, 5).map((s) => ({
+                name: s.name,
+                status: s.status,
+                distance_mi: (s.distance_km ?? 0) * KM_TO_MI,
+              })),
+              migratory_nearby: c?.migratory?.species?.slice(0, 8).map((m) => ({
+                name: m.name,
+                distance_mi: (m.distance_km ?? 0) * KM_TO_MI,
+              })),
+              migration_hotspot: c?.migratory?.hotspot ? {
+                distance_mi: c.migratory.hotspot.distance_km * KM_TO_MI,
+                species_count: c.migratory.hotspot.species_count,
+                flyway: c.migratory.flyway,
+              } : undefined,
             };
 
             return (
