@@ -6,6 +6,8 @@ AskABird is a bird-centered biodiversity web app built for Tucson and the Sonora
 
 Built at **HackArizona**.
 
+## 🌵 Try it live: [www.askabird.us](https://www.askabird.us)
+
 ---
 
 ## What It Does

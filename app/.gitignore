@@ -25,3 +25,6 @@ dist-ssr
 
 # Supabase CLI temp files
 .temp/
+
+# Vite dev cache
+.vite/
