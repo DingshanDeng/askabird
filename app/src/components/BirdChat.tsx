@@ -25,13 +25,14 @@ interface BirdChatProps {
   autoOpener?: string;
   initialMessage?: string;
   quickReplies?: string[];
+  hideHeader?: boolean;
 }
 
 type Msg = { role: "user" | "assistant"; content: string; hidden?: boolean };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bird-chat`;
 
-export default function BirdChat({ siteContext, birdSpecies, autoOpener, initialMessage, quickReplies }: BirdChatProps) {
+export default function BirdChat({ siteContext, birdSpecies, autoOpener, initialMessage, quickReplies, hideHeader }: BirdChatProps) {
   const [messages, setMessages] = useState<Msg[]>(
     initialMessage ? [{ role: "assistant", content: initialMessage }] : []
   );
@@ -159,24 +160,26 @@ export default function BirdChat({ siteContext, birdSpecies, autoOpener, initial
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-2 px-1 pb-2 border-b border-border mb-3">
-        {avatar ? (
-          <img
-            src={avatar}
-            alt={birdSpecies}
-            loading="lazy"
-            className="h-10 w-10 rounded-full object-cover ring-2 ring-saguaro/30 bg-muted"
-          />
-        ) : (
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-saguaro/15 text-saguaro">
-            <Bird className="h-5 w-5" />
+      {!hideHeader && (
+        <div className="flex items-center gap-2 px-1 pb-2 border-b border-border mb-3">
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={birdSpecies}
+              loading="lazy"
+              className="h-10 w-10 rounded-full object-cover ring-2 ring-saguaro/30 bg-muted"
+            />
+          ) : (
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-saguaro/15 text-saguaro">
+              <Bird className="h-5 w-5" />
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-semibold">{birdSpecies}</div>
+            <div className="text-xs text-muted-foreground">Local Sonoran resident</div>
           </div>
-        )}
-        <div>
-          <div className="text-sm font-semibold">{birdSpecies}</div>
-          <div className="text-xs text-muted-foreground">Local Sonoran resident</div>
         </div>
-      </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto pr-3">
         {messages.filter((m) => !m.hidden).length === 0 && !loading && !autoOpener && (
