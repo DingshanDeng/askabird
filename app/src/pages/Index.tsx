@@ -150,7 +150,7 @@ export default function Index() {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground text-center pt-2">
+      {/* <p className="text-xs text-muted-foreground text-center pt-2">
         Bird sighting data powered by{" "}
         <a
           href="https://ebird.org"
@@ -161,7 +161,7 @@ export default function Index() {
           eBird
         </a>
         .
-      </p>
+      </p> */}
     </div>
   );
 }

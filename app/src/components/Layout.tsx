@@ -69,7 +69,8 @@ export default function Layout() {
       </main>
 
       <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        <p>What would a bird think? 🐦 Built for the Sonoran desert.</p>
+        <p>What would a bird think? 🐦 AskABird | Built for the Sonoran desert.</p>
+        <p>Bird data powered by <a href="https://ebird.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">eBird</a> · Conversation powered by Gemma 4</p>
       </footer>
     </div>
   );

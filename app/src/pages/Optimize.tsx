@@ -387,7 +387,7 @@ export default function Optimize() {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground text-center pt-2">
+      {/* <p className="text-xs text-muted-foreground text-center pt-2">
         Bird sighting data powered by{" "}
         <a
           href="https://ebird.org"
@@ -398,7 +398,7 @@ export default function Optimize() {
           eBird
         </a>
         .
-      </p>
+      </p> */}
     </div>
   );
 }
