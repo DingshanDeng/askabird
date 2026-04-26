@@ -66,6 +66,7 @@ class PredictResponse(BaseModel):
     impact_pct: float
     offsets: List[dict]
     extracted_features: dict = Field(default_factory=dict)
+    urban_time_lapse: dict = Field(default_factory=dict)
 
 
 class OptimizeRequest(BaseModel):

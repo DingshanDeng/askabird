@@ -14,6 +14,7 @@ import os
 import requests
 import streamlit as st
 import folium
+from folium.plugins import TimestampedGeoJson
 from streamlit_folium import st_folium
 
 # ---------------------------------------------------------------------------
@@ -66,11 +67,12 @@ st.set_page_config(
 def _init_state():
     defaults = {
         "chat_history": [],
-        "markers": [],          # list of {lat, lon, ctype, impact_score, delta, impact_pct, extracted_features}
+        "markers": [],          # list of {lat, lon, ctype, impact_score, delta, impact_pct, extracted_features, urban_time_lapse}
         "optimal_sites": [],    # list of {lat, lon, impact_score}
         "eco_credit": 100.0,    # running ecological credit score
         "selected_ctype": "power_plant",
         "last_click": None,
+        "last_time_lapse": None # Store the most recent time-lapse data
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -334,6 +336,21 @@ for site in st.session_state.optimal_sites:
         ),
     ).add_to(m)
 
+# Add client-side time-lapse animation if data exists
+if st.session_state.last_time_lapse:
+    TimestampedGeoJson(
+        st.session_state.last_time_lapse,
+        period="P1Y",
+        duration="P1M",
+        add_last_point=True,
+        auto_play=True,
+        loop=False,
+        max_speed=1,
+        loop_button=True,
+        date_options="YYYY",
+        time_slider_drag_update=True
+    ).add_to(m)
+
 # Render map and capture click
 map_data = st_folium(
     m,
@@ -357,6 +374,9 @@ if clicked and clicked != st.session_state.last_click:
         pred = _predict(lat, lon, ctype)
 
     if pred:
+        # Store time-lapse data for the plugin
+        st.session_state.last_time_lapse = pred.get("urban_time_lapse")
+        
         # Store marker
         st.session_state.markers.append(
             {
