@@ -23,7 +23,7 @@ const TUCSON_DEFAULT_BIRDS: { name: string; img: string }[] = [
 ];
 
 const CACTUS_WREN_GREETING =
-  "Pretend you are a friendly Cactus Wren, the Arizona state bird, greeting a human who just opened a web app called 'Ask a Bird'. In 3-4 short sentences, warmly welcome them and explain what they can do here: (1) click anywhere on the map to chat with a local bird about that exact spot, (2) pick one of the top birds nearby (or search for any bird actually seen at that location) to swap who they're talking to, and (3) toggle the biodiversity, endangered, and migration heatmaps in the top-right of the map to see which areas matter most. Sprinkle in a tiny bit of desert personality. Do not mention that you are an AI.";
+  "Chirp! Welcome to Ask a Bird — I'm your Cactus Wren guide! 🌵 Click anywhere on the map to chat with the local bird at that spot, or pick a species from the chips above to switch who you're talking to. Flip on the heatmap layers in the top-right to see where the biodiversity hotspots are. Ask me anything!";
 
 export default function Index() {
   const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -120,7 +120,7 @@ export default function Index() {
               key={`${birdSpecies}-${activeLat}-${activeLon}`}
               siteContext={siteContext}
               birdSpecies={birdSpecies}
-              autoOpener={
+              initialMessage={
                 !location && birdSpecies === "Cactus Wren" ? CACTUS_WREN_GREETING : undefined
               }
             />

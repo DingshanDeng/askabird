@@ -1,6 +1,8 @@
 // Edge function: bird-chat
-// Streams a Gemini response framed as a local Sonoran bird species,
-// given site context (location, construction, scores, top species).
+// Streams a Gemini/Gemma response framed as a local Sonoran bird species.
+// Uses the native Gemini generateContent endpoint (not the OpenAI-compatible
+// proxy) and converts the response to OpenAI SSE format so the frontend
+// BirdChat.tsx parser is unchanged.
 // Set GEMINI_API_KEY (and optionally GEMINI_MODEL) as Supabase secrets.
 
 const corsHeaders = {
@@ -60,51 +62,98 @@ Your neighbors: ${otherSpecies || "other desert birds"}.
 React honestly — happy, worried, or curious — but stay short and simple.
 ${sharedRules}`;
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    // Convert chat history to Gemini contents format.
+    // Gemini uses "model" instead of "assistant" and requires alternating roles.
+    // Do NOT filter by hidden — the hidden flag is UI-only. The auto-opener prompt
+    // must reach the model so it can respond to it.
+    const contents = messages
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+    const geminiResp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: "system", content: systemPrompt }, ...messages],
-          stream: true,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.9 },
         }),
       },
     );
 
-    if (!response.ok) {
-      if (response.status === 429) {
+    if (!geminiResp.ok) {
+      const errText = await geminiResp.text();
+      console.error("Gemini error:", geminiResp.status, errText);
+      if (geminiResp.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit reached, please try again in a moment." }),
+          JSON.stringify({ error: "Rate limit reached. Try again in a moment." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Add credits in workspace settings." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      return new Response(JSON.stringify({ error: "Gemini API error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    // Convert Gemini SSE → OpenAI SSE so BirdChat.tsx needs no changes.
+    const readable = new ReadableStream({
+      async start(controller) {
+        const reader = geminiResp.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const enc = new TextEncoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const json = trimmed.slice(6).trim();
+            if (!json) continue;
+            try {
+              const parsed = JSON.parse(json);
+              // Filter out thinking parts (thought:true) — only stream actual output.
+              const parts: { text?: string; thought?: boolean }[] =
+                parsed.candidates?.[0]?.content?.parts ?? [];
+              const text = parts
+                .filter((p) => !p.thought && p.text)
+                .map((p) => p.text)
+                .join("");
+              if (text) {
+                const chunk = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
+                controller.enqueue(enc.encode(chunk));
+              }
+              if (parsed.candidates?.[0]?.finishReason === "STOP") {
+                controller.enqueue(enc.encode("data: [DONE]\n\n"));
+              }
+            } catch {
+              // skip malformed chunks
+            }
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(readable, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
     console.error("bird-chat error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });

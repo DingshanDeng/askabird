@@ -23,27 +23,31 @@ interface BirdChatProps {
   siteContext: SiteContext;
   birdSpecies: string;
   autoOpener?: string;
+  initialMessage?: string;
 }
 
 type Msg = { role: "user" | "assistant"; content: string; hidden?: boolean };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bird-chat`;
 
-export default function BirdChat({ siteContext, birdSpecies, autoOpener }: BirdChatProps) {
-  const [messages, setMessages] = useState<Msg[]>([]);
+export default function BirdChat({ siteContext, birdSpecies, autoOpener, initialMessage }: BirdChatProps) {
+  const [messages, setMessages] = useState<Msg[]>(
+    initialMessage ? [{ role: "assistant", content: initialMessage }] : []
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Reset chat when site context changes
   useEffect(() => {
-    setMessages([]);
+    setMessages(initialMessage ? [{ role: "assistant", content: initialMessage }] : []);
   }, [siteContext.lat, siteContext.lon, siteContext.construction_type]);
 
   // Auto-opener: send a hidden seed prompt so the bird greets/reacts immediately.
+  // Skipped when initialMessage is provided (greeting is already shown instantly).
   const openerSentRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!autoOpener) return;
+    if (!autoOpener || initialMessage) return;
     const key = `${siteContext.lat},${siteContext.lon},${siteContext.construction_type},${birdSpecies}`;
     if (openerSentRef.current === key) return;
     if (messages.length > 0 || loading) return;
